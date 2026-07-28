@@ -166,7 +166,7 @@
   }
   .legend-bar{
     height:10px; border-radius:5px;
-    background:linear-gradient(to right, #5C1A3D, var(--decline), #9C6B57, var(--neutral), #5B9A82, var(--growth), #D9A441);
+    background:linear-gradient(to right, var(--decline), var(--neutral), var(--growth));
   }
   .legend-ticks{
     display:flex; justify-content:space-between;
@@ -356,7 +356,7 @@
 
     <div class="legend-row">
       <div class="legend-scale">
-        <div class="legend-bar" id="legend-bar"></div>
+        <div class="legend-bar"></div>
         <div class="legend-ticks">
           <span id="legend-tick-0">&minus;10%</span>
           <span id="legend-tick-1">&minus;5%</span>
@@ -559,70 +559,21 @@
     .attr('d', path(stateMesh));
 
   // ---- color scale ----
-  // Two-part approach: a fixed multi-hue RAMP (colorFromT) so "extreme"
-  // shifts hue, not just saturation -- deep plum for severe decline, gold
-  // for explosive growth, so it stays visually distinct at a glance -- and
-  // a symlog VALUE->POSITION mapping (near-linear within a few points of
-  // 0, logarithmic beyond it) so ordinary counties still spread out across
-  // most of the ramp while a +500% county still reads as more extreme than
-  // a +100% one, rather than both maxing out the same color.
-  var COLOR_STOPS_T = [-1, -0.55, -0.15, 0, 0.15, 0.55, 1];
-  var COLOR_STOPS_C = ['#5C1A3D', COLOR_DECLINE, '#9C6B57', COLOR_NEUTRAL, '#5B9A82', COLOR_GROWTH, '#D9A441'];
-
-  var colorFromT = d3.scaleLinear()
-    .domain(COLOR_STOPS_T)
-    .range(COLOR_STOPS_C)
-    .interpolate(d3.interpolateHcl)
-    .clamp(true);
-
-  var SYMLOG_K = 3; // percentage-point width of the near-linear region around 0
-
-  function symlogForward(v, s){
-    var max = v >= 0 ? s.maxPos : s.maxNeg;
-    var denom = Math.log1p(max / SYMLOG_K) || 1;
-    return (v >= 0 ? 1 : -1) * Math.log1p(Math.abs(v) / SYMLOG_K) / denom;
+  function buildColorScale(bound){
+    return d3.scaleLinear()
+      .domain([-bound, 0, bound])
+      .range([COLOR_DECLINE, COLOR_NEUTRAL, COLOR_GROWTH])
+      .interpolate(d3.interpolateRgb)
+      .clamp(true);
   }
 
-  function symlogInverse(t, s){
-    var max = t >= 0 ? s.maxPos : s.maxNeg;
-    var denom = Math.log1p(max / SYMLOG_K) || 1;
-    return (t >= 0 ? 1 : -1) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
-  }
-
-  function computeScaleStats(values){
-    var pos = values.filter(function(v){ return v > 0; }).sort(function(a,b){ return a-b; });
-    var negAbs = values.filter(function(v){ return v < 0; })
-      .map(function(v){ return -v; })
-      .sort(function(a,b){ return a-b; });
-    return {
-      pos: pos,
-      neg: negAbs,
-      maxPos: pos.length ? Math.max(pos[pos.length-1], 0.5) : 0.5,
-      maxNeg: negAbs.length ? Math.max(negAbs[negAbs.length-1], 0.5) : 0.5
-    };
-  }
-
-  function colorForValue(v, stats){
-    var t = symlogForward(v, stats);
-    return colorFromT(Math.max(-1, Math.min(1, t)));
-  }
-
-  function renderLegend(stats){
-    var barEl = document.getElementById('legend-bar');
-    var steps = 40;
-    var stopsCss = [];
-    for (var i = 0; i <= steps; i++){
-      var t = -1 + (2 * i / steps);
-      stopsCss.push(colorFromT(t) + ' ' + (i / steps * 100).toFixed(2) + '%');
-    }
-    barEl.style.background = 'linear-gradient(to right, ' + stopsCss.join(', ') + ')';
-
-    var tickTs = [-1, -0.5, 0, 0.5, 1];
-    var tickIds = ['legend-tick-0','legend-tick-1','legend-tick-2','legend-tick-3','legend-tick-4'];
-    tickTs.forEach(function(t, i){
-      var val = t === 0 ? 0 : symlogInverse(t, stats);
-      document.getElementById(tickIds[i]).textContent = fmtPct(val);
-    });
+  function computeDomainBound(values){
+    if (!values.length) return 5;
+    var abs = values.map(Math.abs).sort(function(a,b){ return a-b; });
+    var idx = Math.min(abs.length-1, Math.floor(0.95*abs.length));
+    var bound = Math.max(abs[idx], 3);
+    var step = bound <= 10 ? 1 : (bound <= 50 ? 5 : 10);
+    return Math.ceil(bound/step)*step;
   }
 
   function fmtInt(n){ return n.toLocaleString('en-US'); }
@@ -662,16 +613,21 @@
       valid.push(pct);
     });
 
-    var stats = computeScaleStats(valid);
+    var bound = computeDomainBound(valid);
+    var color = buildColorScale(bound);
 
     var fillFn = function(d){
       var rec = pctByFips.get(d.id);
-      return rec ? colorForValue(rec.pct, stats) : COLOR_NODATA;
+      return rec ? color(rec.pct) : COLOR_NODATA;
     };
     countyPaths.attr('fill', fillFn);
     ctNewPaths.attr('fill', fillFn);
 
-    renderLegend(stats);
+    document.getElementById('legend-tick-0').textContent = fmtPct(-bound);
+    document.getElementById('legend-tick-1').textContent = fmtPct(-bound/2);
+    document.getElementById('legend-tick-2').textContent = '0%';
+    document.getElementById('legend-tick-3').textContent = fmtPct(bound/2);
+    document.getElementById('legend-tick-4').textContent = fmtPct(bound);
 
     var heroEl = document.getElementById('hero-median');
     if (valid.length){

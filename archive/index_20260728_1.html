@@ -156,6 +156,52 @@
     position:absolute; transform:translateX(-50%);
   }
 
+  .scale-row{
+    display:flex; align-items:center; gap:12px;
+    flex-wrap:wrap;
+    margin:14px 0 6px;
+  }
+  .scale-label{
+    font-size:12.5px; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:0.6px;
+  }
+  .scale-toggle{
+    display:inline-flex;
+    background:var(--bg);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    padding:3px;
+    gap:2px;
+  }
+  .scale-btn{
+    font-family:var(--font-body);
+    font-size:12.5px;
+    color:var(--text-dim);
+    background:transparent;
+    border:none;
+    border-radius:6px;
+    padding:6px 12px;
+    cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease;
+  }
+  .scale-btn:hover{ color:var(--text); }
+  .scale-btn.active{
+    background:var(--panel-border);
+    color:var(--text);
+    font-weight:600;
+  }
+  .scale-btn:focus-visible{
+    outline:2px solid var(--text);
+    outline-offset:2px;
+  }
+  .scale-hint{
+    margin:0 0 12px;
+    font-size:12.5px;
+    color:var(--text-dim);
+    line-height:1.5;
+    max-width:720px;
+  }
+
   .legend-row{
     display:flex; align-items:center; gap:16px;
     flex-wrap:wrap;
@@ -353,6 +399,17 @@
       <div class="slider-thumb" id="thumb-end" role="slider" tabindex="0" aria-label="End year"></div>
     </div>
     <div class="slider-ticks" id="slider-ticks"></div>
+
+    <div class="scale-row">
+      <span class="scale-label">Color scale</span>
+      <div class="scale-toggle" id="scale-toggle" role="group" aria-label="Color scale type">
+        <button type="button" class="scale-btn" data-scale="linear">Linear</button>
+        <button type="button" class="scale-btn" data-scale="sqrt">Sqrt</button>
+        <button type="button" class="scale-btn active" data-scale="symlog">Symlog</button>
+        <button type="button" class="scale-btn" data-scale="quantile">Quantile</button>
+      </div>
+    </div>
+    <p class="scale-hint" id="scale-hint"></p>
 
     <div class="legend-row">
       <div class="legend-scale">
@@ -559,13 +616,23 @@
     .attr('d', path(stateMesh));
 
   // ---- color scale ----
-  // Two-part approach: a fixed multi-hue RAMP (colorFromT) so "extreme"
-  // shifts hue, not just saturation -- deep plum for severe decline, gold
-  // for explosive growth, so it stays visually distinct at a glance -- and
-  // a symlog VALUE->POSITION mapping (near-linear within a few points of
-  // 0, logarithmic beyond it) so ordinary counties still spread out across
-  // most of the ramp while a +500% county still reads as more extreme than
-  // a +100% one, rather than both maxing out the same color.
+  // The old version mapped raw percent change through a 3-color *linear*
+  // scale clamped to a ~95th-percentile bound. That meant every county
+  // past the bound (e.g. +100% and +500%) collapsed to the same maximum
+  // color, and clamp(true) threw away the actual extremes entirely.
+  //
+  // This version splits the problem in two:
+  //   1) a fixed 7-stop color RAMP (colorFromT) that runs across a wide
+  //      hue range so "extreme" doesn't just mean "more saturated red/green"
+  //      -- it shifts hue (deep plum for severe decline, gold for explosive
+  //      growth), which stays visually distinct at a glance.
+  //   2) a swappable VALUE->POSITION mapping (SCALE_DEFS) that decides how
+  //      a given percent change lands on that ramp. Linear reproduces the
+  //      old behavior (and shows why it struggles with this data); Sqrt and
+  //      Symlog compress the long tail so typical counties still spread out
+  //      across visible color; Quantile spends the ramp on rank rather than
+  //      magnitude, guaranteeing full contrast regardless of how skewed the
+  //      underlying numbers are.
   var COLOR_STOPS_T = [-1, -0.55, -0.15, 0, 0.15, 0.55, 1];
   var COLOR_STOPS_C = ['#5C1A3D', COLOR_DECLINE, '#9C6B57', COLOR_NEUTRAL, '#5B9A82', COLOR_GROWTH, '#D9A441'];
 
@@ -577,17 +644,61 @@
 
   var SYMLOG_K = 3; // percentage-point width of the near-linear region around 0
 
-  function symlogForward(v, s){
-    var max = v >= 0 ? s.maxPos : s.maxNeg;
-    var denom = Math.log1p(max / SYMLOG_K) || 1;
-    return (v >= 0 ? 1 : -1) * Math.log1p(Math.abs(v) / SYMLOG_K) / denom;
-  }
+  var SCALE_DEFS = {
+    linear: {
+      label: 'Linear',
+      hint: 'Equal color change per percentage point, scaled to the actual min/max in view. Simple, but one huge outlier (like a +500% county) still squeezes every ordinary county toward the middle color.',
+      forward: function(v, s){ return v >= 0 ? v / s.maxPos : v / s.maxNeg; },
+      inverse: function(t, s){ return t >= 0 ? t * s.maxPos : t * s.maxNeg; }
+    },
+    sqrt: {
+      label: 'Sqrt',
+      hint: 'Square-root compression. Gives ordinary counties more visible color spread than Linear while still letting extreme values stand out further out on the ramp.',
+      forward: function(v, s){
+        var max = v >= 0 ? s.maxPos : s.maxNeg;
+        return (v >= 0 ? 1 : -1) * Math.sqrt(Math.abs(v) / max);
+      },
+      inverse: function(t, s){
+        var max = t >= 0 ? s.maxPos : s.maxNeg;
+        return (t >= 0 ? 1 : -1) * t * t * max;
+      }
+    },
+    symlog: {
+      label: 'Symlog',
+      hint: 'Near-linear within \u00b1' + SYMLOG_K + '%, logarithmic beyond it. Best general-purpose choice for this data: typical counties spread across most of the ramp, and a +500% county still reads as clearly more extreme than a +100% one instead of both maxing out the same color.',
+      forward: function(v, s){
+        var max = v >= 0 ? s.maxPos : s.maxNeg;
+        var denom = Math.log1p(max / SYMLOG_K) || 1;
+        return (v >= 0 ? 1 : -1) * Math.log1p(Math.abs(v) / SYMLOG_K) / denom;
+      },
+      inverse: function(t, s){
+        var max = t >= 0 ? s.maxPos : s.maxNeg;
+        var denom = Math.log1p(max / SYMLOG_K) || 1;
+        return (t >= 0 ? 1 : -1) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
+      }
+    },
+    quantile: {
+      label: 'Quantile',
+      hint: 'Each shade covers an equal number of counties (ranked separately for growth and decline). Maximizes contrast across the whole map, at the cost of position no longer reading as a literal percentage.',
+      forward: function(v, s){
+        if (v === 0) return 0;
+        var arr = v > 0 ? s.pos : s.neg;
+        if (!arr.length) return 0;
+        var idx = d3.bisectLeft(arr, Math.abs(v));
+        var frac = arr.length > 1 ? idx / (arr.length - 1) : 1;
+        return (v > 0 ? 1 : -1) * Math.max(0, Math.min(1, frac));
+      },
+      inverse: function(t, s){
+        var arr = t >= 0 ? s.pos : s.neg;
+        if (!arr.length) return 0;
+        var idx = Math.round(Math.abs(t) * (arr.length - 1));
+        idx = Math.max(0, Math.min(arr.length - 1, idx));
+        return (t >= 0 ? 1 : -1) * arr[idx];
+      }
+    }
+  };
 
-  function symlogInverse(t, s){
-    var max = t >= 0 ? s.maxPos : s.maxNeg;
-    var denom = Math.log1p(max / SYMLOG_K) || 1;
-    return (t >= 0 ? 1 : -1) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
-  }
+  var currentScaleType = 'symlog';
 
   function computeScaleStats(values){
     var pos = values.filter(function(v){ return v > 0; }).sort(function(a,b){ return a-b; });
@@ -603,7 +714,7 @@
   }
 
   function colorForValue(v, stats){
-    var t = symlogForward(v, stats);
+    var t = SCALE_DEFS[currentScaleType].forward(v, stats);
     return colorFromT(Math.max(-1, Math.min(1, t)));
   }
 
@@ -617,12 +728,14 @@
     }
     barEl.style.background = 'linear-gradient(to right, ' + stopsCss.join(', ') + ')';
 
+    var def = SCALE_DEFS[currentScaleType];
     var tickTs = [-1, -0.5, 0, 0.5, 1];
     var tickIds = ['legend-tick-0','legend-tick-1','legend-tick-2','legend-tick-3','legend-tick-4'];
     tickTs.forEach(function(t, i){
-      var val = t === 0 ? 0 : symlogInverse(t, stats);
+      var val = t === 0 ? 0 : def.inverse(t, stats);
       document.getElementById(tickIds[i]).textContent = fmtPct(val);
     });
+    document.getElementById('scale-hint').textContent = def.hint;
   }
 
   function fmtInt(n){ return n.toLocaleString('en-US'); }
@@ -838,6 +951,18 @@
   }
   attachHover(countyPaths);
   attachHover(ctNewPaths);
+
+  // ---- scale-type toggle ----
+  var scaleButtons = Array.prototype.slice.call(document.querySelectorAll('.scale-btn'));
+  scaleButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var type = btn.getAttribute('data-scale');
+      if (type === currentScaleType || !SCALE_DEFS[type]) return;
+      currentScaleType = type;
+      scaleButtons.forEach(function(b){ b.classList.toggle('active', b === btn); });
+      computeAndRender(currentStart, currentEnd);
+    });
+  });
 
   // ---- init ----
   buildTicks();
