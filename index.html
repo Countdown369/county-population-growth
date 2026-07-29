@@ -764,9 +764,9 @@ function linearForward(v, s) {
   return Math.max(-1, Math.min(1, v / minMax));
 }
 
-  function linearInverse(t, s){
-    var max = t >= 0 ? s.maxPos : s.maxNeg;
-    return (t >= 0 ? 1 : -1) * Math.abs(t) * max;
+  function linearInverse(t, s) {
+    const minMax = Math.min(Math.abs(s.maxNeg), Math.abs(s.maxPos));
+    return Math.max(-1, Math.min(1, t)) * minMax;
   }
 
   var scaleMode = 'symlog'; // 'symlog' | 'linear'
