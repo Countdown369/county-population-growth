@@ -759,10 +759,10 @@
   // Plain linear alternative: position is just the value's share of the
   // largest same-signed value currently in view, so ordinary counties bunch
   // up near the middle and a handful of extreme counties stretch the scale.
-  function linearForward(v, s){
-    var max = v >= 0 ? s.maxPos : s.maxNeg;
-    return Math.max(-1, Math.min(1, (v >= 0 ? 1 : -1) * Math.abs(v) / max));
-  }
+function linearForward(v, s) {
+  const minMax = Math.min(Math.abs(s.maxNeg), Math.abs(s.maxPos));
+  return Math.max(-1, Math.min(1, v / minMax));
+}
 
   function linearInverse(t, s){
     var max = t >= 0 ? s.maxPos : s.maxNeg;
