@@ -190,13 +190,11 @@
     padding:6px;
     flex:1;
     min-height:420px;
-    overflow:hidden;
   }
-  #map-svg{ width:100%; height:100%; display:block; touch-action:pan-y; }
+  #map-svg{ width:100%; height:100%; display:block; }
   .county{
     stroke:rgba(10,14,20,0.55);
     stroke-width:0.4;
-    vector-effect:non-scaling-stroke;
     transition:filter 0.1s ease;
   }
   .county:hover, .county.hovered{
@@ -209,117 +207,7 @@
     stroke:rgba(237,239,243,0.35);
     stroke-width:0.9;
     stroke-linejoin:round;
-    vector-effect:non-scaling-stroke;
     pointer-events:none;
-  }
-
-  .zoom-controls{
-    position:absolute;
-    right:14px; bottom:14px;
-    display:flex; flex-direction:column;
-    gap:6px;
-    z-index:10;
-  }
-  .zoom-btn{
-    width:34px; height:34px;
-    display:flex; align-items:center; justify-content:center;
-    background:rgba(11,17,26,0.88);
-    border:1px solid var(--panel-border);
-    border-radius:7px;
-    color:var(--text);
-    font-size:18px;
-    font-family:var(--font-body);
-    line-height:1;
-    cursor:pointer;
-    user-select:none;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .zoom-btn:active{ background:rgba(217,164,65,0.25); }
-  #zoom-reset{
-    font-size:11.5px;
-    opacity:0.9;
-    display:none;
-  }
-  #zoom-reset.visible{ display:flex; }
-
-  .map-hint{
-    position:absolute;
-    left:50%; top:10px;
-    transform:translateX(-50%);
-    background:rgba(11,17,26,0.85);
-    border:1px solid var(--panel-border);
-    border-radius:20px;
-    padding:6px 13px;
-    font-size:12px;
-    color:var(--text-dim);
-    white-space:nowrap;
-    pointer-events:none;
-    z-index:10;
-    display:none;
-    animation:hintFade 6s ease forwards;
-  }
-  .mobile-mode .map-hint{ display:block; }
-  @keyframes hintFade{
-    0%, 75%{ opacity:1; }
-    100%{ opacity:0; visibility:hidden; }
-  }
-
-  #mobile-panel{
-    position:fixed;
-    left:50%; bottom:0;
-    width:100%; max-width:480px;
-    z-index:60;
-    background:#0B111A;
-    border:1px solid var(--panel-border);
-    border-bottom:none;
-    border-radius:14px 14px 0 0;
-    padding:16px 40px 16px 18px;
-    padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px));
-    box-shadow:0 -8px 24px rgba(0,0,0,0.5);
-    transform:translate(-50%, 100%);
-    transition:transform 0.22s ease;
-  }
-  #mobile-panel.visible{ transform:translate(-50%, 0); }
-  #mobile-panel .mp-close{
-    position:absolute;
-    top:8px; right:8px;
-    width:32px; height:32px;
-    display:flex; align-items:center; justify-content:center;
-    background:none;
-    border:none;
-    color:var(--text-dim);
-    font-size:22px;
-    cursor:pointer;
-    -webkit-tap-highlight-color:transparent;
-  }
-  #mobile-panel .tt-name{ font-size:15px; font-weight:600; margin-bottom:6px; }
-  #mobile-panel .tt-row{ font-size:14px; padding:1px 0; }
-  #mobile-panel .tt-pct{ font-size:18px; }
-
-  .scale-toggle{
-    display:inline-flex;
-    border:1px solid var(--panel-border);
-    border-radius:7px;
-    overflow:hidden;
-    flex-shrink:0;
-  }
-  .scale-btn{
-    background:none;
-    border:none;
-    color:var(--text-dim);
-    font-family:var(--font-data);
-    font-size:12px;
-    padding:6px 12px;
-    cursor:pointer;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .scale-btn + .scale-btn{ border-left:1px solid var(--panel-border); }
-  .scale-btn.active{ background:var(--accent); color:#1A1305; font-weight:600; }
-  .scale-note{
-    flex-basis:100%;
-    font-size:11.5px;
-    color:var(--text-dim);
-    margin-top:2px;
   }
 
   #tooltip{
@@ -336,12 +224,12 @@
     box-shadow:0 6px 18px rgba(0,0,0,0.45);
     max-width:240px;
   }
-  .tt-name{ font-weight:600; margin-bottom:4px; color:var(--text); }
-  .tt-row{ display:flex; justify-content:space-between; gap:14px; font-family:var(--font-data); color:var(--text-dim); }
-  .tt-pct{ margin-top:5px; font-family:var(--font-data); font-weight:600; font-size:15px; }
-  .tt-pct.up{ color:var(--growth); }
-  .tt-pct.down{ color:var(--decline); }
-  .tt-nodata{ color:var(--text-dim); font-style:italic; }
+  #tooltip .tt-name{ font-weight:600; margin-bottom:4px; color:var(--text); }
+  #tooltip .tt-row{ display:flex; justify-content:space-between; gap:14px; font-family:var(--font-data); color:var(--text-dim); }
+  #tooltip .tt-pct{ margin-top:5px; font-family:var(--font-data); font-weight:600; font-size:15px; }
+  #tooltip .tt-pct.up{ color:var(--growth); }
+  #tooltip .tt-pct.down{ color:var(--decline); }
+  #tooltip .tt-nodata{ color:var(--text-dim); font-style:italic; }
 
   footer.notes{
     margin-top:16px;
@@ -477,22 +365,12 @@
           <span id="legend-tick-4">+10%</span>
         </div>
       </div>
-      <div class="scale-toggle" role="group" aria-label="Color scale type">
-        <button type="button" class="scale-btn active" data-scale="symlog">Symlog</button>
-        <button type="button" class="scale-btn" data-scale="linear">Linear</button>
-      </div>
       <div class="legend-nodata"><span class="swatch"></span>No data for this span</div>
     </div>
   </div>
 
-  <div class="map-wrap" id="map-wrap">
+  <div class="map-wrap">
     <svg id="map-svg"></svg>
-    <div class="map-hint" id="map-hint">Two fingers to pan &amp; zoom &middot; tap a county for details</div>
-    <div class="zoom-controls">
-      <button type="button" class="zoom-btn" id="zoom-in" aria-label="Zoom in">+</button>
-      <button type="button" class="zoom-btn" id="zoom-out" aria-label="Zoom out">&minus;</button>
-      <button type="button" class="zoom-btn" id="zoom-reset" aria-label="Reset zoom">&#8634;</button>
-    </div>
   </div>
 
   <footer class="notes">
@@ -505,10 +383,6 @@
 
 </div>
 <div id="tooltip"></div>
-<div id="mobile-panel">
-  <button type="button" class="mp-close" id="mobile-panel-close" aria-label="Close">&times;</button>
-  <div id="mobile-panel-content"></div>
-</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
@@ -662,14 +536,8 @@
   var pad = 14;
   var vbX = bbox[0]-pad, vbY = bbox[1]-pad, vbW = (bbox[2]-bbox[0])+2*pad, vbH = (bbox[3]-bbox[1])+2*pad;
 
-  // Coarse-pointer / no-hover devices (phones, most tablets) get tap-to-open
-  // info panel + pinch-zoom instead of hover tooltips.
-  var MOBILE_MODE = !!(window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches);
-  if (MOBILE_MODE) document.getElementById('map-wrap').classList.add('mobile-mode');
-
   var svg = d3.select('#map-svg').attr('viewBox', vbX+' '+vbY+' '+vbW+' '+vbH);
-  var gZoom = svg.append('g').attr('class','zoom-g');
-  var gCounties = gZoom.append('g').attr('class','counties-g');
+  var gCounties = svg.append('g').attr('class','counties-g');
 
   var countyPaths = gCounties.selectAll('path.county')
     .data(geo.features)
@@ -686,44 +554,9 @@
       .attr('data-fips', function(d){ return d.id; })
       .style('display', 'none');
 
-  gZoom.append('path')
+  svg.append('path')
     .attr('class','state-borders')
     .attr('d', path(stateMesh));
-
-  // ---- pinch-to-zoom / pan ----
-  // Small counties are hard to hit with a finger, so letting people zoom in
-  // first is the real fix for that -- the tap targets get physically
-  // bigger. Two-finger gestures drive it (filter below) rather than a
-  // single finger, so one-finger dragging still scrolls the page normally
-  // instead of fighting the map for the touch. Wheel-zoom only responds
-  // when ctrl/meta is held (how trackpad pinch is reported), so a plain
-  // mouse-wheel scroll over the map still scrolls the page, not the map.
-  var svgRect0 = svg.node().getBoundingClientRect();
-  var zoomBehavior = d3.zoom()
-    .scaleExtent([1, 10])
-    .translateExtent([[-svgRect0.width*0.6, -svgRect0.height*0.6], [svgRect0.width*1.6, svgRect0.height*1.6]])
-    .filter(function(event){
-      if (event.type === 'wheel') return event.ctrlKey || event.metaKey;
-      if (event.touches) return event.touches.length > 1;
-      return !event.button;
-    })
-    .on('zoom', function(event){
-      gZoom.attr('transform', event.transform);
-      var isDefault = event.transform.k <= 1.01 && Math.abs(event.transform.x) < 0.5 && Math.abs(event.transform.y) < 0.5;
-      document.getElementById('zoom-reset').classList.toggle('visible', !isDefault);
-    });
-
-  svg.call(zoomBehavior);
-
-  document.getElementById('zoom-in').addEventListener('click', function(){
-    svg.transition().duration(200).call(zoomBehavior.scaleBy, 1.6);
-  });
-  document.getElementById('zoom-out').addEventListener('click', function(){
-    svg.transition().duration(200).call(zoomBehavior.scaleBy, 1/1.6);
-  });
-  document.getElementById('zoom-reset').addEventListener('click', function(){
-    svg.transition().duration(220).call(zoomBehavior.transform, d3.zoomIdentity);
-  });
 
   // ---- color scale ----
   // Two-part approach: a fixed multi-hue RAMP (colorFromT) so "extreme"
@@ -756,23 +589,6 @@
     return (t >= 0 ? 1 : -1) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
   }
 
-  // Plain linear alternative: position is just the value's share of the
-  // largest same-signed value currently in view, so ordinary counties bunch
-  // up near the middle and a handful of extreme counties stretch the scale.
-  function linearForward(v, s){
-    var max = v >= 0 ? s.maxPos : s.maxNeg;
-    return Math.max(-1, Math.min(1, (v >= 0 ? 1 : -1) * Math.abs(v) / max));
-  }
-
-  function linearInverse(t, s){
-    var max = t >= 0 ? s.maxPos : s.maxNeg;
-    return (t >= 0 ? 1 : -1) * Math.abs(t) * max;
-  }
-
-  var scaleMode = 'symlog'; // 'symlog' | 'linear'
-  function scaleForward(v, s){ return scaleMode === 'linear' ? linearForward(v, s) : symlogForward(v, s); }
-  function scaleInverse(t, s){ return scaleMode === 'linear' ? linearInverse(t, s) : symlogInverse(t, s); }
-
   function computeScaleStats(values){
     var pos = values.filter(function(v){ return v > 0; }).sort(function(a,b){ return a-b; });
     var negAbs = values.filter(function(v){ return v < 0; })
@@ -787,7 +603,7 @@
   }
 
   function colorForValue(v, stats){
-    var t = scaleForward(v, stats);
+    var t = symlogForward(v, stats);
     return colorFromT(Math.max(-1, Math.min(1, t)));
   }
 
@@ -804,7 +620,7 @@
     var tickTs = [-1, -0.5, 0, 0.5, 1];
     var tickIds = ['legend-tick-0','legend-tick-1','legend-tick-2','legend-tick-3','legend-tick-4'];
     tickTs.forEach(function(t, i){
-      var val = t === 0 ? 0 : scaleInverse(t, stats);
+      var val = t === 0 ? 0 : symlogInverse(t, stats);
       document.getElementById(tickIds[i]).textContent = fmtPct(val);
     });
   }
@@ -873,12 +689,6 @@
     document.getElementById('hero-grow-count').textContent = fmtInt(growCount);
     document.getElementById('hero-shrink-count').textContent = fmtInt(shrinkCount);
     document.getElementById('hero-nodata-count').textContent = fmtInt(noDataCount);
-
-    if (MOBILE_MODE && selectedFips){
-      var selFeature = activeFeatures.filter(function(f){ return f.id === selectedFips; })[0];
-      if (selFeature) mobilePanelContent.innerHTML = infoHtml(selFeature);
-      else hideMobilePanel();
-    }
   }
 
   // ---- slider ----
@@ -992,30 +802,23 @@
     scheduleUpdate();
   });
 
-  // ---- tooltip / info panel ----
-  // Desktop keeps the original cursor-anchored hover tooltip. Touch has no
-  // hover state, and a cursor-anchored box would just sit under the
-  // finger that's supposed to be reading it -- and on a tap it opens and
-  // closes (pointerenter then pointerleave-on-lift) almost before it's
-  // visible. So on touch, tapping a county instead opens a panel docked to
-  // the bottom of the screen that stays put until it's dismissed.
+  // ---- tooltip ----
   var tooltip = d3.select('#tooltip');
 
-  function infoHtml(d){
+  function showTooltip(event, d){
     var rec = pctByFips.get(d.id);
+    var html;
     if (!rec){
       var fallback = countiesById[d.id];
       var name = fallback ? fallback.n : 'Unknown county';
-      return '<div class="tt-name">'+name+'</div><div class="tt-nodata">No data for this span</div>';
+      html = '<div class="tt-name">'+name+'</div><div class="tt-nodata">No data for this span</div>';
+    } else {
+      html = '<div class="tt-name">'+rec.name+'</div>'
+        + '<div class="tt-row"><span>'+currentStart+'</span><span>'+fmtInt(rec.pStart)+'</span></div>'
+        + '<div class="tt-row"><span>'+currentEnd+'</span><span>'+fmtInt(rec.pEnd)+'</span></div>'
+        + '<div class="tt-pct '+(rec.pct>=0?'up':'down')+'">'+fmtPct(rec.pct)+'</div>';
     }
-    return '<div class="tt-name">'+rec.name+'</div>'
-      + '<div class="tt-row"><span>'+currentStart+'</span><span>'+fmtInt(rec.pStart)+'</span></div>'
-      + '<div class="tt-row"><span>'+currentEnd+'</span><span>'+fmtInt(rec.pEnd)+'</span></div>'
-      + '<div class="tt-pct '+(rec.pct>=0?'up':'down')+'">'+fmtPct(rec.pct)+'</div>';
-  }
-
-  function showTooltip(event, d){
-    tooltip.html(infoHtml(d)).style('opacity', 1);
+    tooltip.html(html).style('opacity', 1);
     positionTooltip(event);
   }
 
@@ -1033,66 +836,8 @@
       .on('pointermove', function(event, d){ showTooltip(event, d); })
       .on('pointerleave', function(){ d3.select(this).classed('hovered', false); tooltip.style('opacity', 0); });
   }
-
-  var mobilePanel = document.getElementById('mobile-panel');
-  var mobilePanelContent = document.getElementById('mobile-panel-content');
-  var selectedFips = null;
-
-  function showMobilePanel(d){
-    selectedFips = d.id;
-    mobilePanelContent.innerHTML = infoHtml(d);
-    mobilePanel.classList.add('visible');
-    countyPaths.classed('hovered', function(dd){ return dd.id === selectedFips; });
-    ctNewPaths.classed('hovered', function(dd){ return dd.id === selectedFips; });
-  }
-
-  function hideMobilePanel(){
-    selectedFips = null;
-    mobilePanel.classList.remove('visible');
-    countyPaths.classed('hovered', false);
-    ctNewPaths.classed('hovered', false);
-  }
-
-  document.getElementById('mobile-panel-close').addEventListener('click', hideMobilePanel);
-  // The panel commonly covers the very county that opened it (it's short
-  // dock at the bottom of a small screen), so a second tap "in the same
-  // spot" lands on the panel, not the map underneath. Treat any tap on the
-  // panel as a dismiss too, not just the close button, so that still works.
-  mobilePanel.addEventListener('click', hideMobilePanel);
-
-  function attachTap(selection){
-    selection.on('click', function(event, d){
-      event.stopPropagation();
-      if (selectedFips === d.id){ hideMobilePanel(); return; }
-      showMobilePanel(d);
-    });
-  }
-
-  if (MOBILE_MODE){
-    attachTap(countyPaths);
-    attachTap(ctNewPaths);
-    // Tapping anywhere outside the panel dismisses it -- not just inside
-    // the map, since the panel can end up covering the very county that
-    // opened it. County taps call stopPropagation() so they reach this
-    // listener only when they *don't* match the already-selected county.
-    document.addEventListener('click', function(event){
-      if (selectedFips && !mobilePanel.contains(event.target)) hideMobilePanel();
-    });
-  } else {
-    attachHover(countyPaths);
-    attachHover(ctNewPaths);
-  }
-
-  // ---- scale toggle ----
-  document.querySelectorAll('.scale-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var mode = btn.getAttribute('data-scale');
-      if (mode === scaleMode) return;
-      scaleMode = mode;
-      document.querySelectorAll('.scale-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
-      computeAndRender(currentStart, currentEnd);
-    });
-  });
+  attachHover(countyPaths);
+  attachHover(ctNewPaths);
 
   // ---- init ----
   buildTicks();
