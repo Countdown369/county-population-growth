@@ -16,6 +16,8 @@
     --neutral: #8A7F6B;
     --growth: #2F9E86;
     --nodata: #3A4356;
+    --compare-a: #D9A441;
+    --compare-b: #5B9AD9;
     --font-display: "Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;
     --font-body: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --font-data: ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",monospace;
@@ -325,6 +327,126 @@
     margin-top:2px;
   }
 
+  /* ---- county comparison panel (desktop only) ---- */
+  .compare-panel{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:20px 24px 22px;
+    margin-bottom:18px;
+  }
+  .compare-header{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .compare-header h2{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:19px;
+    margin:0 0 4px;
+    color:var(--text);
+  }
+  .compare-hint{
+    margin:0;
+    font-size:13px;
+    color:var(--text-dim);
+    max-width:540px;
+    line-height:1.5;
+  }
+  .compare-clear{
+    background:none;
+    border:1px solid var(--panel-border);
+    border-radius:7px;
+    color:var(--text-dim);
+    font-family:var(--font-data);
+    font-size:11.5px;
+    padding:7px 14px;
+    cursor:pointer;
+    flex-shrink:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .compare-clear:hover{ color:var(--text); border-color:var(--text-dim); }
+
+  .compare-slots{
+    display:flex; align-items:center; gap:14px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .compare-slot{
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg);
+    border:1px solid var(--panel-border);
+    border-radius:7px;
+    padding:8px 14px;
+    font-size:13.5px;
+    color:var(--text-dim);
+    min-width:180px;
+    flex:1;
+  }
+  .compare-slot.filled{ color:var(--text); cursor:pointer; }
+  .compare-slot.filled:hover{ border-color:var(--text-dim); }
+  .compare-slot .dot{
+    width:10px; height:10px; border-radius:50%; flex-shrink:0;
+  }
+  .compare-slot .dot-a{ background:var(--compare-a); }
+  .compare-slot .dot-b{ background:var(--compare-b); }
+  .compare-slot .slot-name{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .compare-vs{
+    font-family:var(--font-data);
+    font-size:11.5px;
+    color:var(--text-dim);
+    flex-shrink:0;
+  }
+
+  .compare-chart-wrap{ position:relative; min-height:60px; }
+  #compare-svg{ width:100%; height:300px; display:block; }
+  .compare-chart-wrap.empty #compare-svg{ display:none; }
+  .compare-placeholder{
+    display:none;
+    align-items:center; justify-content:center;
+    height:180px;
+    border:1px dashed var(--panel-border);
+    border-radius:8px;
+    color:var(--text-dim);
+    font-size:13px;
+    text-align:center;
+    padding:0 24px;
+  }
+  .compare-chart-wrap.empty .compare-placeholder{ display:flex; }
+
+  .compare-axis text{
+    fill:var(--text-dim);
+    font-family:var(--font-data);
+    font-size:10.5px;
+  }
+  .compare-axis path, .compare-axis line{ stroke:var(--panel-border); }
+  .compare-baseline{
+    stroke:var(--text-dim);
+    stroke-width:1;
+    stroke-dasharray:3,4;
+    opacity:0.6;
+  }
+  .compare-end-label{
+    font-family:var(--font-data);
+    font-size:11.5px;
+    font-weight:600;
+  }
+  .compare-summary{
+    display:flex; gap:22px; flex-wrap:wrap;
+    margin-top:10px;
+    font-family:var(--font-data);
+    font-size:13px;
+  }
+  .compare-summary-item{ font-weight:600; }
+  .compare-summary-note{ color:var(--text-dim); }
+
+  .county.compare-a{ stroke:var(--compare-a); stroke-width:2.4; }
+  .county.compare-b{ stroke:var(--compare-b); stroke-width:2.4; }
+  .county.compare-a:hover, .county.compare-b:hover{ stroke-width:2.8; }
+
   #tooltip{
     position:fixed;
     z-index:50;
@@ -500,6 +622,26 @@
       <button type="button" class="zoom-btn" id="zoom-out" aria-label="Zoom out">&minus;</button>
       <button type="button" class="zoom-btn" id="zoom-reset" aria-label="Reset zoom">&#8634;</button>
     </div>
+  </div>
+
+  <div class="compare-panel" id="compare-panel">
+    <div class="compare-header">
+      <div>
+        <h2>Compare Two Counties</h2>
+        <p class="compare-hint" id="compare-hint">Click two counties on the map to compare their growth trajectories.</p>
+      </div>
+      <button type="button" class="compare-clear" id="compare-clear">Clear</button>
+    </div>
+    <div class="compare-slots">
+      <div class="compare-slot" id="compare-slot-a"><span class="dot dot-a"></span><span class="slot-name">Click a county&hellip;</span></div>
+      <span class="compare-vs">vs</span>
+      <div class="compare-slot" id="compare-slot-b"><span class="dot dot-b"></span><span class="slot-name">Click a county&hellip;</span></div>
+    </div>
+    <div class="compare-chart-wrap empty" id="compare-chart-wrap">
+      <svg id="compare-svg"></svg>
+      <div class="compare-placeholder" id="compare-placeholder">Select two counties on the map above &mdash; each click fills the next open slot.</div>
+    </div>
+    <div class="compare-summary" id="compare-summary"></div>
   </div>
 
   <footer class="notes">
@@ -926,6 +1068,15 @@ function linearForward(v, s) {
       if (selFeature) mobilePanelContent.innerHTML = infoHtml(selFeature);
       else hideMobilePanel();
     }
+
+    // Keep the two-county comparison (span- and metric-dependent) in sync
+    // with the slider and the %/raw toggle. No-ops on mobile, where the
+    // feature doesn't exist. Also reapplies the map highlight classes since
+    // the CT old/new path sets can swap which paths are actually visible.
+    if (!MOBILE_MODE){
+      applyCompareHighlight();
+      updateCompareUI();
+    }
   }
 
   // ---- slider ----
@@ -1154,6 +1305,227 @@ function linearForward(v, s) {
     });
   }
 
+  // ---- compare two counties (desktop only) ----
+  // Desktop has no other use for a plain click on a county (hover already
+  // drives the tooltip), so clicking becomes "select for comparison" there.
+  // Touch devices need tap for the info panel instead, and a hairline-thin
+  // multi-point log-scale line chart isn't something we can make usable at
+  // phone width anyway, so the whole feature is skipped in MOBILE_MODE --
+  // panel hidden, no click handlers attached, nothing computed on interaction.
+  var comparePanel = document.getElementById('compare-panel');
+  var compareFipsA = null, compareFipsB = null;
+  var compareSvg = d3.select('#compare-svg');
+  var compareChartWrap = document.getElementById('compare-chart-wrap');
+  var compareHintEl = document.getElementById('compare-hint');
+  var compareSummaryEl = document.getElementById('compare-summary');
+  var compareSlotA = document.getElementById('compare-slot-a');
+  var compareSlotB = document.getElementById('compare-slot-b');
+
+  function countyDisplayName(fips){
+    var rec = countiesById[fips];
+    return rec ? rec.n : 'Unknown county';
+  }
+
+  function applyCompareHighlight(){
+    countyPaths
+      .classed('compare-a', function(d){ return d.id === compareFipsA; })
+      .classed('compare-b', function(d){ return d.id === compareFipsB; });
+    ctNewPaths
+      .classed('compare-a', function(d){ return d.id === compareFipsA; })
+      .classed('compare-b', function(d){ return d.id === compareFipsB; });
+  }
+
+  function toggleCompareSelection(fips){
+    if (fips === compareFipsA){ compareFipsA = null; }
+    else if (fips === compareFipsB){ compareFipsB = null; }
+    else if (!compareFipsA){ compareFipsA = fips; }
+    else if (!compareFipsB){ compareFipsB = fips; }
+    else { compareFipsA = compareFipsB; compareFipsB = fips; } // rotate: newest click bumps the older slot
+    applyCompareHighlight();
+    updateCompareUI();
+  }
+
+  function attachCompareClick(selection){
+    selection.on('click', function(event, d){ toggleCompareSelection(d.id); });
+  }
+
+  function clearCompareSelection(){
+    compareFipsA = null; compareFipsB = null;
+    applyCompareHighlight();
+    updateCompareUI();
+  }
+
+  document.getElementById('compare-clear').addEventListener('click', clearCompareSelection);
+  compareSlotA.addEventListener('click', function(){ if (compareFipsA){ compareFipsA = null; applyCompareHighlight(); updateCompareUI(); } });
+  compareSlotB.addEventListener('click', function(){ if (compareFipsB){ compareFipsB = null; applyCompareHighlight(); updateCompareUI(); } });
+
+  function updateCompareSlots(){
+    compareSlotA.querySelector('.slot-name').textContent = compareFipsA ? countyDisplayName(compareFipsA) : 'Click a county\u2026';
+    compareSlotA.classList.toggle('filled', !!compareFipsA);
+    compareSlotB.querySelector('.slot-name').textContent = compareFipsB ? countyDisplayName(compareFipsB) : 'Click a county\u2026';
+    compareSlotB.classList.toggle('filled', !!compareFipsB);
+  }
+
+  // Builds both series over whatever slice of the currently selected year
+  // span both counties actually have data for, indexed so they "start at
+  // the same point": population/baseline*100 in % mode (baseline = 100,
+  // always positive so a log y-axis works), or population-minus-baseline
+  // in raw mode (baseline = 0, but raw change can go negative on a decline,
+  // so log is impossible there and we fall back to a linear axis instead).
+  function computeCompareSeries(){
+    if (!compareFipsA || !compareFipsB) return null;
+    var recA = countiesById[compareFipsA], recB = countiesById[compareFipsB];
+    if (!recA || !recB) return { insufficientData: true };
+    var si = YEARS.indexOf(currentStart), ei = YEARS.indexOf(currentEnd);
+    if (si === -1) si = 0;
+    if (ei === -1) ei = NUM_YEARS - 1;
+    var idxs = [];
+    for (var i = si; i <= ei; i++){
+      if (recA.p[i] != null && recB.p[i] != null) idxs.push(i);
+    }
+    if (idxs.length < 2) return { insufficientData: true };
+    var baseIdx = idxs[0];
+    var baseA = recA.p[baseIdx], baseB = recB.p[baseIdx];
+    var isRaw = metricMode === 'raw';
+    var years = idxs.map(function(i){ return YEARS[i]; });
+    var seriesA = idxs.map(function(i){ return isRaw ? (recA.p[i] - baseA) : (recA.p[i] / baseA * 100); });
+    var seriesB = idxs.map(function(i){ return isRaw ? (recB.p[i] - baseB) : (recB.p[i] / baseB * 100); });
+    return {
+      insufficientData: false,
+      years: years, a: seriesA, b: seriesB,
+      nameA: recA.n, nameB: recB.n,
+      baseYear: YEARS[baseIdx], isRaw: isRaw
+    };
+  }
+
+  function renderCompareChart(data){
+    compareSvg.selectAll('*').remove();
+    var hasChart = data && !data.insufficientData;
+    compareChartWrap.classList.toggle('empty', !hasChart);
+    if (!hasChart) return;
+
+    var W = 640, H = 320;
+    var margin = { top: 16, right: 96, bottom: 54, left: 60 };
+    var innerW = W - margin.left - margin.right;
+    var innerH = H - margin.top - margin.bottom;
+    compareSvg.attr('viewBox', '0 0 ' + W + ' ' + H).attr('preserveAspectRatio', 'xMidYMid meet');
+
+    var g = compareSvg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+    var x = d3.scaleLinear().domain(d3.extent(data.years)).range([0, innerW]);
+
+    var allVals = data.a.concat(data.b);
+    var y, baseline;
+    if (data.isRaw){
+      var maxAbs = Math.max(d3.max(allVals, Math.abs), 1);
+      y = d3.scaleLinear().domain([-maxAbs * 1.1, maxAbs * 1.1]).range([innerH, 0]).nice();
+      baseline = 0;
+    } else {
+      var minV = d3.min(allVals), maxV = d3.max(allVals);
+      if (minV === maxV){ minV *= 0.97; maxV *= 1.03; }
+      var pad = Math.pow(maxV / minV, 0.1);
+      y = d3.scaleLog().domain([minV / pad, maxV * pad]).range([innerH, 0]);
+      baseline = 100;
+    }
+
+    var yAxis = d3.axisLeft(y).ticks(5).tickFormat(function(v){ return data.isRaw ? fmtRaw(v) : Math.round(v); });
+
+    // With a wide year span (or closely-spaced vintages), a tick per data
+    // point can pack in tighter than any horizontal label can survive, so
+    // thin them out to a legible count and always draw the labels
+    // vertically rather than horizontally -- vertical text takes a fraction
+    // of the horizontal room per tick, so it stays readable however many
+    // years are in play.
+    var MAX_X_TICKS = 10;
+    var xTickVals = data.years;
+    if (xTickVals.length > MAX_X_TICKS){
+      var step = Math.ceil(xTickVals.length / MAX_X_TICKS);
+      xTickVals = xTickVals.filter(function(_, i){ return i % step === 0 || i === data.years.length - 1; });
+    }
+    var xAxis = d3.axisBottom(x).tickValues(xTickVals).tickFormat(d3.format('d'));
+
+    g.append('g').attr('class', 'compare-axis compare-axis-y').call(yAxis);
+    g.append('g').attr('class', 'compare-axis compare-axis-x')
+      .attr('transform', 'translate(0,' + innerH + ')')
+      .call(xAxis)
+      .selectAll('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('text-anchor', 'end')
+        .attr('dx', '-0.9em')
+        .attr('dy', '-0.3em');
+
+    g.append('line').attr('class', 'compare-baseline')
+      .attr('x1', 0).attr('x2', innerW).attr('y1', y(baseline)).attr('y2', y(baseline));
+
+    var lineGen = d3.line()
+      .x(function(d, i){ return x(data.years[i]); })
+      .y(function(d){ return y(d); })
+      .curve(d3.curveMonotoneX);
+
+    function drawSeries(vals, color, cls, name){
+      g.append('path')
+        .datum(vals)
+        .attr('fill', 'none')
+        .attr('stroke', color)
+        .attr('stroke-width', 2.4)
+        .attr('d', lineGen);
+      g.selectAll(null)
+        .data(vals)
+        .join('circle')
+          .attr('cx', function(d, i){ return x(data.years[i]); })
+          .attr('cy', function(d){ return y(d); })
+          .attr('r', 3.4)
+          .attr('fill', color)
+          .attr('stroke', '#0B111A')
+          .attr('stroke-width', 1);
+      var lastX = x(data.years[data.years.length - 1]);
+      var lastY = y(vals[vals.length - 1]);
+      g.append('text')
+        .attr('class', 'compare-end-label')
+        .attr('x', lastX + 8).attr('y', lastY)
+        .attr('dy', '0.32em')
+        .attr('fill', color)
+        .text(name.split(',')[0]);
+    }
+    drawSeries(data.a, 'var(--compare-a)', 'a', data.nameA);
+    drawSeries(data.b, 'var(--compare-b)', 'b', data.nameB);
+  }
+
+  function updateCompareSummary(data){
+    if (!data || data.insufficientData){ compareSummaryEl.innerHTML = ''; return; }
+    var lastA = data.a[data.a.length - 1], lastB = data.b[data.b.length - 1];
+    var changeA = data.isRaw ? lastA : (lastA - 100);
+    var changeB = data.isRaw ? lastB : (lastB - 100);
+    var fmt = data.isRaw ? fmtRaw : fmtPct;
+    compareSummaryEl.innerHTML =
+      '<span class="compare-summary-item" style="color:var(--compare-a)">' + data.nameA + ': ' + fmt(changeA) + '</span>' +
+      '<span class="compare-summary-item" style="color:var(--compare-b)">' + data.nameB + ': ' + fmt(changeB) + '</span>' +
+      '<span class="compare-summary-note">since ' + data.baseYear + '</span>';
+  }
+
+  function updateCompareHint(data){
+    if (!compareFipsA && !compareFipsB){
+      compareHintEl.textContent = 'Click two counties on the map to compare their growth trajectories.';
+    } else if (!compareFipsB){
+      compareHintEl.textContent = 'Click a second county to compare.';
+    } else if (!data || data.insufficientData){
+      compareHintEl.textContent = 'Not enough overlapping data for these two counties in the selected year span \u2014 try widening it.';
+    } else if (data.isRaw){
+      compareHintEl.textContent = 'Raw population change since ' + data.baseYear + '. Linear scale \u2014 raw change can go negative, so a log axis isn\u2019t possible here.';
+    } else {
+      compareHintEl.textContent = 'Population indexed to 100 at ' + data.baseYear + ', log scale \u2014 equal proportional growth looks equal, however different the counties\u2019 sizes.';
+    }
+  }
+
+  function updateCompareUI(){
+    if (MOBILE_MODE) return;
+    updateCompareSlots();
+    var data = computeCompareSeries();
+    renderCompareChart(data);
+    updateCompareSummary(data);
+    updateCompareHint(data);
+  }
+
   if (MOBILE_MODE){
     attachTap(countyPaths);
     attachTap(ctNewPaths);
@@ -1164,9 +1536,15 @@ function linearForward(v, s) {
     document.addEventListener('click', function(event){
       if (selectedFips && !mobilePanel.contains(event.target)) hideMobilePanel();
     });
+    // The comparison chart needs a cursor-driven click-to-select and real
+    // screen width for the line chart; neither holds on touch, so the
+    // whole panel is hidden rather than shipping a half-working version.
+    comparePanel.style.display = 'none';
   } else {
     attachHover(countyPaths);
     attachHover(ctNewPaths);
+    attachCompareClick(countyPaths);
+    attachCompareClick(ctNewPaths);
   }
 
   // ---- scale toggle ----
