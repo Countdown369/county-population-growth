@@ -298,14 +298,15 @@
   #mobile-panel .tt-row{ font-size:14px; padding:1px 0; }
   #mobile-panel .tt-pct{ font-size:18px; }
 
-  .scale-toggle{
+  .scale-toggle, .metric-toggle{
     display:inline-flex;
     border:1px solid var(--panel-border);
     border-radius:7px;
     overflow:hidden;
     flex-shrink:0;
   }
-  .scale-btn{
+  .metric-toggle{ align-self:center; }
+  .scale-btn, .metric-btn{
     background:none;
     border:none;
     color:var(--text-dim);
@@ -315,8 +316,8 @@
     cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
-  .scale-btn + .scale-btn{ border-left:1px solid var(--panel-border); }
-  .scale-btn.active{ background:var(--accent); color:#1A1305; font-weight:600; }
+  .scale-btn + .scale-btn, .metric-btn + .metric-btn{ border-left:1px solid var(--panel-border); }
+  .scale-btn.active, .metric-btn.active{ background:var(--accent); color:#1A1305; font-weight:600; }
   .scale-note{
     flex-basis:100%;
     font-size:11.5px;
@@ -435,13 +436,17 @@
 
   <header class="top">
     <h1>US County Population Atlas</h1>
-    <p class="sub" id="subtitle">Drag the handles below to pick a year span. Every county recolors by its percent population change across that span &mdash; US Census Bureau county population estimates.</p>
+    <p class="sub" id="subtitle">Drag the handles below to pick a year span. Every county recolors by its population change across that span &mdash; toggle between percent and raw change above &mdash; US Census Bureau county population estimates.</p>
   </header>
 
   <div class="hero-row">
     <div class="hero-stat">
       <div class="value flat" id="hero-median">&mdash;</div>
-      <div class="label">Median county change</div>
+      <div class="label" id="hero-median-label">Median % change</div>
+    </div>
+    <div class="metric-toggle" role="group" aria-label="Population change metric">
+      <button type="button" class="metric-btn active" data-metric="pct">% Change</button>
+      <button type="button" class="metric-btn" data-metric="raw">Raw Change</button>
     </div>
     <div class="hero-sub">
       <span class="grow-count"><b id="hero-grow-count">&mdash;</b> counties grew</span>
@@ -638,7 +643,7 @@
   var countiesById = popData.counties;
 
   document.getElementById('subtitle').textContent =
-    'Drag the handles below to pick a year span. Every county recolors by its percent population change across that span \u2014 US Census Bureau county population estimates, ' + YEARS[0] + '\u2013' + YEARS[YEARS.length-1] + '.';
+    'Drag the handles below to pick a year span. Every county recolors by its population change across that span \u2014 toggle between percent and raw change above \u2014 US Census Bureau county population estimates, ' + YEARS[0] + '\u2013' + YEARS[YEARS.length-1] + '.';
 
   var COLOR_DECLINE = '#C1443A';
   var COLOR_NEUTRAL = '#8A7F6B';
@@ -744,18 +749,18 @@
     .interpolate(d3.interpolateHcl)
     .clamp(true);
 
-  var SYMLOG_K = 3; // percentage-point width of the near-linear region around 0
+  var SYMLOG_K_PCT = 3; // percentage-point width of the near-linear region around 0, in % mode
 
   function symlogForward(v, s){
     var max = v >= 0 ? s.maxPos : s.maxNeg;
-    var denom = Math.log1p(max / SYMLOG_K) || 1;
-    return (v >= 0 ? 1 : -1) * Math.log1p(Math.abs(v) / SYMLOG_K) / denom;
+    var denom = Math.log1p(max / s.k) || 1;
+    return (v >= 0 ? 1 : -1) * Math.log1p(Math.abs(v) / s.k) / denom;
   }
 
   function symlogInverse(t, s){
     var max = t >= 0 ? s.maxPos : s.maxNeg;
-    var denom = Math.log1p(max / SYMLOG_K) || 1;
-    return (t >= 0 ? 1 : -1) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
+    var denom = Math.log1p(max / s.k) || 1;
+    return (t >= 0 ? 1 : -1) * s.k * Math.expm1(Math.abs(t) * denom);
   }
 
       
@@ -800,17 +805,26 @@ function linearForward(v, s) {
   function scaleForward(v, s){ return scaleMode === 'linear' ? linearForward(v, s) : symlogForward(v, s); }
   function scaleInverse(t, s){ return scaleMode === 'linear' ? linearInverse(t, s) : symlogInverse(t, s); }
 
-  function computeScaleStats(values){
+  var metricMode = 'pct'; // 'pct' | 'raw' -- percent change vs. raw head-count difference
+
+  // computeScaleStats is called with whichever metric's values are
+  // currently in play (percent-change numbers or raw person-count diffs),
+  // so the near-linear symlog width (k) can't be a single fixed constant --
+  // 3 percentage points and 3 people are not comparable widths. In % mode
+  // we keep the original fixed 3-point width (unchanged behavior). In raw
+  // mode we derive k from the data itself: a small fraction of the larger
+  // side's max magnitude, floored so a few huge counties don't compress
+  // everything else to the extremes of the ramp.
+  function computeScaleStats(values, mode){
     var pos = values.filter(function(v){ return v > 0; }).sort(function(a,b){ return a-b; });
     var negAbs = values.filter(function(v){ return v < 0; })
       .map(function(v){ return -v; })
       .sort(function(a,b){ return a-b; });
-    return {
-      pos: pos,
-      neg: negAbs,
-      maxPos: pos.length ? Math.max(pos[pos.length-1], 0.5) : 0.5,
-      maxNeg: negAbs.length ? Math.max(negAbs[negAbs.length-1], 0.5) : 0.5
-    };
+    var floor = mode === 'raw' ? 1 : 0.5;
+    var maxPos = pos.length ? Math.max(pos[pos.length-1], floor) : floor;
+    var maxNeg = negAbs.length ? Math.max(negAbs[negAbs.length-1], floor) : floor;
+    var k = mode === 'raw' ? Math.max(50, Math.max(maxPos, maxNeg) * 0.03) : SYMLOG_K_PCT;
+    return { pos: pos, neg: negAbs, maxPos: maxPos, maxNeg: maxNeg, k: k };
   }
 
   function colorForValue(v, stats){
@@ -818,7 +832,7 @@ function linearForward(v, s) {
     return colorFromT(Math.max(-1, Math.min(1, t)));
   }
 
-  function renderLegend(stats){
+  function renderLegend(stats, mode){
     var barEl = document.getElementById('legend-bar');
     var steps = 40;
     var stopsCss = [];
@@ -832,12 +846,13 @@ function linearForward(v, s) {
     var tickIds = ['legend-tick-0','legend-tick-1','legend-tick-2','legend-tick-3','legend-tick-4'];
     tickTs.forEach(function(t, i){
       var val = t === 0 ? 0 : scaleInverse(t, stats);
-      document.getElementById(tickIds[i]).textContent = fmtPct(val);
+      document.getElementById(tickIds[i]).textContent = mode === 'raw' ? fmtRaw(val) : fmtPct(val);
     });
   }
 
   function fmtInt(n){ return n.toLocaleString('en-US'); }
   function fmtPct(p){ return (p >= 0 ? '+' : '') + p.toFixed(1) + '%'; }
+  function fmtRaw(n){ var r = Math.round(n); return (r >= 0 ? '+' : '') + r.toLocaleString('en-US'); }
 
   // ---- state ----
   var startIdx = 0, endIdx = NUM_YEARS - 1;
@@ -869,28 +884,33 @@ function linearForward(v, s) {
       var pStart = rec.p[si], pEnd = rec.p[ei];
       if (pStart == null || pEnd == null || pStart === 0){ noDataCount++; return; }
       var pct = (pEnd - pStart) / pStart * 100;
-      pctByFips.set(fips, { pct: pct, pStart: pStart, pEnd: pEnd, name: rec.n });
-      valid.push(pct);
+      var raw = pEnd - pStart;
+      pctByFips.set(fips, { pct: pct, raw: raw, pStart: pStart, pEnd: pEnd, name: rec.n });
+      valid.push(metricMode === 'raw' ? raw : pct);
     });
 
-    var stats = computeScaleStats(valid);
+    var stats = computeScaleStats(valid, metricMode);
 
     var fillFn = function(d){
       var rec = pctByFips.get(d.id);
-      return rec ? colorForValue(rec.pct, stats) : COLOR_NODATA;
+      if (!rec) return COLOR_NODATA;
+      return colorForValue(metricMode === 'raw' ? rec.raw : rec.pct, stats);
     };
     countyPaths.attr('fill', fillFn);
     ctNewPaths.attr('fill', fillFn);
 
-    renderLegend(stats);
+    renderLegend(stats, metricMode);
 
     var heroEl = document.getElementById('hero-median');
+    document.getElementById('hero-median-label').textContent =
+      metricMode === 'raw' ? 'Median raw change' : 'Median % change';
     if (valid.length){
       var sorted = valid.slice().sort(function(a,b){ return a-b; });
       var mid = Math.floor(sorted.length/2);
       var median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
-      heroEl.textContent = fmtPct(median);
-      heroEl.className = 'value ' + (median > 0.05 ? 'up' : (median < -0.05 ? 'down' : 'flat'));
+      var flatThresh = metricMode === 'raw' ? 0.5 : 0.05;
+      heroEl.textContent = metricMode === 'raw' ? fmtRaw(median) : fmtPct(median);
+      heroEl.className = 'value ' + (median > flatThresh ? 'up' : (median < -flatThresh ? 'down' : 'flat'));
     } else {
       heroEl.textContent = '\u2014';
       heroEl.className = 'value flat';
@@ -1072,10 +1092,12 @@ function linearForward(v, s) {
       var name = fallback ? fallback.n : 'Unknown county';
       return '<div class="tt-name">'+name+'</div><div class="tt-nodata">No data for this span</div>';
     }
+    var headlineVal = metricMode === 'raw' ? rec.raw : rec.pct;
+    var headlineText = metricMode === 'raw' ? fmtRaw(rec.raw) : fmtPct(rec.pct);
     return '<div class="tt-name">'+rec.name+'</div>'
       + '<div class="tt-row"><span>'+currentStart+'</span><span>'+fmtInt(rec.pStart)+'</span></div>'
       + '<div class="tt-row"><span>'+currentEnd+'</span><span>'+fmtInt(rec.pEnd)+'</span></div>'
-      + '<div class="tt-pct '+(rec.pct>=0?'up':'down')+'">'+fmtPct(rec.pct)+'</div>';
+      + '<div class="tt-pct '+(headlineVal>=0?'up':'down')+'">'+headlineText+'</div>';
   }
 
   function showTooltip(event, d){
@@ -1154,6 +1176,17 @@ function linearForward(v, s) {
       if (mode === scaleMode) return;
       scaleMode = mode;
       document.querySelectorAll('.scale-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      computeAndRender(currentStart, currentEnd);
+    });
+  });
+
+  // ---- metric toggle (percent change vs. raw head-count difference) ----
+  document.querySelectorAll('.metric-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var mode = btn.getAttribute('data-metric');
+      if (mode === metricMode) return;
+      metricMode = mode;
+      document.querySelectorAll('.metric-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
       computeAndRender(currentStart, currentEnd);
     });
   });
