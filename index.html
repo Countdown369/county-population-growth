@@ -639,17 +639,19 @@
     </div>
     <div class="compare-chart-wrap empty" id="compare-chart-wrap">
       <svg id="compare-svg"></svg>
-      <div class="compare-placeholder" id="compare-placeholder">Select two counties on the map above &mdash; each click fills the next open slot.</div>
+      <div class="compare-placeholder" id="compare-placeholder">Select two counties on the map above.</div>
     </div>
     <div class="compare-summary" id="compare-summary"></div>
   </div>
 
   <footer class="notes">
-    Source: US Census Bureau Population Estimates Program (county-level intercensal estimates, vintages 2025, 2020, 2010, 2000, and 1990).
+    Source: US Census Bureau Population Estimates Program.
     <br><br>
-    Connecticut's eight historical counties were replaced by nine planning regions in 2022, so spans that start at-or-before 2019 and end at-or-after 2020 can't compute a comparable figure for Connecticut and show as no-data.
+    Connecticut's eight historical counties were replaced by nine planning regions in 2022, so spans that start at-or-before 2019 and end at-or-after 2020 can't compute figures for Connecticut and show as no-data.
     <br>
     Alaska's Chugach and Copper River Census Areas are mapped using their former combined Valdez&ndash;Cordova boundary, which the Census Bureau split in 2019. Due to other changes in Alaska's Census Area boundaries, only partial data for the state is available before 2000.
+    <br><br>
+    Contact me: brown dot co at $champions_of_the_70th_Beanpot dot edu
   </footer>
 
 </div>
@@ -785,7 +787,7 @@
   var countiesById = popData.counties;
 
   document.getElementById('subtitle').textContent =
-    'Drag the handles below to pick a year span. Every county recolors by its population change across that span \u2014 toggle between percent and raw change above \u2014 US Census Bureau county population estimates, ' + YEARS[0] + '\u2013' + YEARS[YEARS.length-1] + '.';
+    'Drag the handles below to choose a year span. Toggle between percent and raw change. US Census Bureau county population estimates, ' + YEARS[0] + '\u2013' + YEARS[YEARS.length-1] + '.';
 
   var COLOR_DECLINE = '#C1443A';
   var COLOR_NEUTRAL = '#8A7F6B';
@@ -1509,11 +1511,11 @@ function linearForward(v, s) {
     } else if (!compareFipsB){
       compareHintEl.textContent = 'Click a second county to compare.';
     } else if (!data || data.insufficientData){
-      compareHintEl.textContent = 'Not enough overlapping data for these two counties in the selected year span \u2014 try widening it.';
+      compareHintEl.textContent = 'Not enough overlapping data for these two counties in the selected year span.';
     } else if (data.isRaw){
-      compareHintEl.textContent = 'Raw population change since ' + data.baseYear + '. Linear scale \u2014 raw change can go negative, so a log axis isn\u2019t possible here.';
+      compareHintEl.textContent = 'Raw population change since ' + data.baseYear + ', linear scale.';
     } else {
-      compareHintEl.textContent = 'Population indexed to 100 at ' + data.baseYear + ', log scale \u2014 equal proportional growth looks equal, however different the counties\u2019 sizes.';
+      compareHintEl.textContent = 'Population indexed to 100 at ' + data.baseYear + ', log scale.';
     }
   }
 
