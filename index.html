@@ -478,7 +478,7 @@
         </div>
       </div>
       <div class="scale-toggle" role="group" aria-label="Color scale type">
-        <button type="button" class="scale-btn active" data-scale="symlog">Symlog</button>
+        <button type="button" class="scale-btn active" data-scale="symlog">Asymlog</button>
         <button type="button" class="scale-btn" data-scale="linear">Linear</button>
       </div>
       <div class="legend-nodata"><span class="swatch"></span>No data for this span</div>
@@ -755,6 +755,31 @@
     var denom = Math.log1p(max / SYMLOG_K) || 1;
     return (t >= 0 ? 1 : -1) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
   }
+
+      
+// Actual symmetry; looks worse.
+      
+//function symlogForward(v, s) {
+//  const minMax = Math.min(Math.abs(s.maxNeg), Math.abs(s.maxPos));
+//  const denom = Math.log1p(minMax / SYMLOG_K) || 1;
+//
+//  return Math.max(
+//    -1,
+//    Math.min(
+//      1,
+//      Math.sign(v) * Math.log1p(Math.abs(v) / SYMLOG_K) / denom
+//    )
+//  );
+//}
+
+//function symlogInverse(t, s) {
+//  const minMax = Math.min(Math.abs(s.maxNeg), Math.abs(s.maxPos));
+//  const denom = Math.log1p(minMax / SYMLOG_K) || 1;
+//
+//  t = Math.max(-1, Math.min(1, t));
+//
+//  return Math.sign(t) * SYMLOG_K * Math.expm1(Math.abs(t) * denom);
+//}
 
   // Plain linear alternative: position is just the value's share of the
   // largest same-signed value currently in view, so ordinary counties bunch
