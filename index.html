@@ -129,8 +129,10 @@
     transform:translateY(-50%);
     background:linear-gradient(to right, var(--decline), var(--neutral), var(--growth));
     border-radius:4px;
-    pointer-events:none;
+    cursor:grab;
+    touch-action:none;
   }
+  .slider-fill.active{ cursor:grabbing; }
   .slider-thumb{
     position:absolute; top:50%; width:20px; height:20px;
     transform:translate(-50%,-50%);
@@ -1008,6 +1010,43 @@ function linearForward(v, s) {
   }
   attachDrag(thumbStart, true);
   attachDrag(thumbEnd, false);
+
+  // Dragging the fill bar itself pans the whole span (keeps its width fixed)
+  // rather than snapping the nearest handle to the cursor.
+  function attachRangeDrag(el){
+    el.addEventListener('pointerdown', function(e){
+      // Stop this from bubbling up to trackEl's pointerdown handler below,
+      // which would otherwise also snap the nearest thumb to the click point.
+      e.stopPropagation();
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('active');
+
+      var span = endIdx - startIdx;
+      var anchorIdx = xToIdx(e.clientX);
+      var anchorStartIdx = startIdx;
+
+      function onMove(ev){
+        var idx = xToIdx(ev.clientX);
+        var delta = idx - anchorIdx;
+        var newStart = anchorStartIdx + delta;
+        // Clamp so the span stays fully within [0, NUM_YEARS-1] and keeps its width.
+        newStart = Math.max(0, Math.min(newStart, (NUM_YEARS-1) - span));
+        startIdx = newStart;
+        endIdx = newStart + span;
+        renderThumbs();
+        scheduleUpdate();
+      }
+      function onUp(ev){
+        try{ el.releasePointerCapture(e.pointerId); }catch(err){}
+        el.classList.remove('active');
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      }
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    });
+  }
+  attachRangeDrag(fillEl);
 
   trackEl.addEventListener('pointerdown', function(e){
     var idx = xToIdx(e.clientX);
