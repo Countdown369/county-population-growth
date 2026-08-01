@@ -685,7 +685,7 @@
   <div id="mobile-panel-content"></div>
   <button type="button" class="mp-compare-btn" id="mobile-panel-compare">
     <span class="dot" id="mobile-panel-compare-dot"></span>
-    <span id="mobile-panel-compare-label">Add to Compare</span>
+    <span id="mobile-panel-compare-label">Toggle Compare</span>
   </button>
 </div>
 
@@ -847,7 +847,7 @@
   if (MOBILE_MODE){
     document.getElementById('map-wrap').classList.add('mobile-mode');
     document.getElementById('compare-placeholder').textContent =
-      'Tap a county on the map above, then use "Add to Compare" in its panel. Do that for a second county to see the chart here.';
+      'Tap a county on the map above, then use "Toggle Compare" in its panel. Do that for a second county to see the chart here.';
   }
 
   var svg = d3.select('#map-svg').attr('viewBox', vbX+' '+vbY+' '+vbW+' '+vbH);
@@ -1413,7 +1413,7 @@ function linearForward(v, s) {
     compareSlotB.classList.toggle('filled', !!compareFipsB);
   }
 
-  // ---- mobile "Add to Compare" button (lives inside the tap-to-open info
+  // ---- mobile "Toggle Compare" button (lives inside the tap-to-open info
   // panel, since a plain tap on the map is already spoken for by that
   // panel on touch devices -- see attachTap below). Selecting/deselecting
   // goes through the same toggleCompareSelection() as the desktop's
@@ -1428,8 +1428,8 @@ function linearForward(v, s) {
     mobileCompareDot.className = 'dot' + (isA ? ' dot-a' : isB ? ' dot-b' : '');
     mobileCompareBtn.classList.toggle('active', isA || isB);
     mobileCompareLabel.textContent = (isA || isB)
-      ? 'Remove from Compare'
-      : ((compareFipsA || compareFipsB) ? 'Add as 2nd County' : 'Add to Compare');
+      ? 'Toggle Compare'
+      : ((compareFipsA || compareFipsB) ? 'Toggle Compare' : 'Toggle Compare');
   }
 
   mobileCompareBtn.addEventListener('click', function(event){
@@ -1610,7 +1610,7 @@ function linearForward(v, s) {
   function updateCompareHint(data){
     if (!compareFipsA && !compareFipsB){
       compareHintEl.textContent = MOBILE_MODE
-        ? 'Tap a county, then use "Add to Compare" in its panel. Do that for two counties to compare their growth trajectories.'
+        ? 'Tap a county, then use "Toggle Compare" in its panel. Do that for two counties to compare their growth trajectories.'
         : 'Click two counties on the map to compare their growth trajectories.';
     } else if (!compareFipsB){
       compareHintEl.textContent = MOBILE_MODE
