@@ -849,10 +849,24 @@
   // instead of fighting the map for the touch. Wheel-zoom only responds
   // when ctrl/meta is held (how trackpad pinch is reported), so a plain
   // mouse-wheel scroll over the map still scrolls the page, not the map.
-  var svgRect0 = svg.node().getBoundingClientRect();
+  // translateExtent must be given in the <svg>'s own viewBox coordinate
+  // system, not CSS/client pixels. Because this <svg> has a viewBox, d3.zoom
+  // internally derives its "extent" (the box it checks translateExtent
+  // against) from viewBox.baseVal -- i.e. vbX/vbY/vbW/vbH -- regardless of
+  // how large the element is rendered on screen. Using getBoundingClientRect()
+  // here mixed two different coordinate systems together. That mismatch was
+  // easy to miss because it happened to be harmless on wide viewports: the
+  // CSS pixel width of the map (e.g. ~1100px on desktop, ~700px on an iPad)
+  // was still bigger than the viewBox's own ~975-unit width, so the (wrongly
+  // scaled) extent was still generous enough to cover the whole map. On an
+  // iPhone the CSS width shrinks to ~330px, which is much *smaller* than the
+  // 975-unit viewBox, so the allowed pan region shrank down to a small
+  // fraction of the map's real coordinate space -- which is exactly why
+  // zooming only ever reached one small corner (top-right) and never let you
+  // pan far enough to reach Maine, WV, Florida, etc.
   var zoomBehavior = d3.zoom()
     .scaleExtent([1, 10])
-    .translateExtent([[-svgRect0.width*0.6, -svgRect0.height*0.6], [svgRect0.width*1.6, svgRect0.height*1.6]])
+    .translateExtent([[vbX - vbW*0.6, vbY - vbH*0.6], [vbX + vbW*1.6, vbY + vbH*1.6]])
     .filter(function(event){
       if (event.type === 'wheel') return event.ctrlKey || event.metaKey;
       if (event.touches) return event.touches.length > 1;
