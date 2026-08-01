@@ -299,6 +299,27 @@
   #mobile-panel .tt-name{ font-size:15px; font-weight:600; margin-bottom:6px; }
   #mobile-panel .tt-row{ font-size:14px; padding:1px 0; }
   #mobile-panel .tt-pct{ font-size:18px; }
+  #mobile-panel .mp-compare-btn{
+    display:flex; align-items:center; gap:9px;
+    width:100%;
+    margin-top:14px;
+    padding:10px 14px;
+    background:var(--bg);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    color:var(--text-dim);
+    font-family:var(--font-data);
+    font-size:13px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #mobile-panel .mp-compare-btn.active{ color:var(--text); border-color:var(--text-dim); }
+  #mobile-panel .mp-compare-btn .dot{
+    width:10px; height:10px; border-radius:50%; flex-shrink:0;
+    background:var(--panel-border);
+  }
+  #mobile-panel .mp-compare-btn .dot.dot-a{ background:var(--compare-a); }
+  #mobile-panel .mp-compare-btn .dot.dot-b{ background:var(--compare-b); }
 
   .scale-toggle, .metric-toggle{
     display:inline-flex;
@@ -327,7 +348,7 @@
     margin-top:2px;
   }
 
-  /* ---- county comparison panel (desktop only) ---- */
+  /* ---- county comparison panel (desktop + mobile) ---- */
   .compare-panel{
     background:var(--panel);
     border:1px solid var(--panel-border);
@@ -481,6 +502,9 @@
     .hero-row{ flex-direction:column; align-items:flex-start; gap:12px; }
     .hero-sub{ margin-left:0; }
     .map-wrap{ min-height:320px; }
+    .compare-panel{ padding:16px 16px 18px; }
+    .compare-slot{ min-width:130px; padding:8px 10px; }
+    .compare-summary{ gap:14px; }
   }
   @media (prefers-reduced-motion: reduce){
     *{ transition:none !important; }
@@ -659,6 +683,10 @@
 <div id="mobile-panel">
   <button type="button" class="mp-close" id="mobile-panel-close" aria-label="Close">&times;</button>
   <div id="mobile-panel-content"></div>
+  <button type="button" class="mp-compare-btn" id="mobile-panel-compare">
+    <span class="dot" id="mobile-panel-compare-dot"></span>
+    <span id="mobile-panel-compare-label">Add to Compare</span>
+  </button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -816,7 +844,11 @@
   // Coarse-pointer / no-hover devices (phones, most tablets) get tap-to-open
   // info panel + pinch-zoom instead of hover tooltips.
   var MOBILE_MODE = !!(window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches);
-  if (MOBILE_MODE) document.getElementById('map-wrap').classList.add('mobile-mode');
+  if (MOBILE_MODE){
+    document.getElementById('map-wrap').classList.add('mobile-mode');
+    document.getElementById('compare-placeholder').textContent =
+      'Tap a county on the map above, then use "Add to Compare" in its panel. Do that for a second county to see the chart here.';
+  }
 
   var svg = d3.select('#map-svg').attr('viewBox', vbX+' '+vbY+' '+vbW+' '+vbH);
   var gZoom = svg.append('g').attr('class','zoom-g');
@@ -1086,13 +1118,11 @@ function linearForward(v, s) {
     }
 
     // Keep the two-county comparison (span- and metric-dependent) in sync
-    // with the slider and the %/raw toggle. No-ops on mobile, where the
-    // feature doesn't exist. Also reapplies the map highlight classes since
-    // the CT old/new path sets can swap which paths are actually visible.
-    if (!MOBILE_MODE){
-      applyCompareHighlight();
-      updateCompareUI();
-    }
+    // with the slider and the %/raw toggle, on desktop and mobile alike.
+    // Also reapplies the map highlight classes since the CT old/new path
+    // sets can swap which paths are actually visible.
+    applyCompareHighlight();
+    updateCompareUI();
   }
 
   // ---- slider ----
@@ -1321,13 +1351,13 @@ function linearForward(v, s) {
     });
   }
 
-  // ---- compare two counties (desktop only) ----
+  // ---- compare two counties (desktop + mobile) ----
   // Desktop has no other use for a plain click on a county (hover already
-  // drives the tooltip), so clicking becomes "select for comparison" there.
-  // Touch devices need tap for the info panel instead, and a hairline-thin
-  // multi-point log-scale line chart isn't something we can make usable at
-  // phone width anyway, so the whole feature is skipped in MOBILE_MODE --
-  // panel hidden, no click handlers attached, nothing computed on interaction.
+  // drives the tooltip), so clicking becomes "select for comparison" there
+  // (attachCompareClick, below). Touch devices need tap for the info panel
+  // instead, so on mobile the comparison is driven by an explicit "Add to
+  // Compare" button inside that panel (see mobileCompareBtn) rather than
+  // the tap itself -- both paths funnel into the same toggleCompareSelection().
   var comparePanel = document.getElementById('compare-panel');
   var compareFipsA = null, compareFipsB = null;
   var compareSvg = d3.select('#compare-svg');
@@ -1376,11 +1406,48 @@ function linearForward(v, s) {
   compareSlotB.addEventListener('click', function(){ if (compareFipsB){ compareFipsB = null; applyCompareHighlight(); updateCompareUI(); } });
 
   function updateCompareSlots(){
-    compareSlotA.querySelector('.slot-name').textContent = compareFipsA ? countyDisplayName(compareFipsA) : 'Click a county\u2026';
+    var placeholder = MOBILE_MODE ? 'Tap a county\u2026' : 'Click a county\u2026';
+    compareSlotA.querySelector('.slot-name').textContent = compareFipsA ? countyDisplayName(compareFipsA) : placeholder;
     compareSlotA.classList.toggle('filled', !!compareFipsA);
-    compareSlotB.querySelector('.slot-name').textContent = compareFipsB ? countyDisplayName(compareFipsB) : 'Click a county\u2026';
+    compareSlotB.querySelector('.slot-name').textContent = compareFipsB ? countyDisplayName(compareFipsB) : placeholder;
     compareSlotB.classList.toggle('filled', !!compareFipsB);
   }
+
+  // ---- mobile "Add to Compare" button (lives inside the tap-to-open info
+  // panel, since a plain tap on the map is already spoken for by that
+  // panel on touch devices -- see attachTap below). Selecting/deselecting
+  // goes through the same toggleCompareSelection() as the desktop's
+  // click-on-map path, so both flows stay in sync automatically.
+  var mobileCompareBtn = document.getElementById('mobile-panel-compare');
+  var mobileCompareDot = document.getElementById('mobile-panel-compare-dot');
+  var mobileCompareLabel = document.getElementById('mobile-panel-compare-label');
+
+  function updateMobileCompareButton(){
+    if (!selectedFips) return;
+    var isA = selectedFips === compareFipsA, isB = selectedFips === compareFipsB;
+    mobileCompareDot.className = 'dot' + (isA ? ' dot-a' : isB ? ' dot-b' : '');
+    mobileCompareBtn.classList.toggle('active', isA || isB);
+    mobileCompareLabel.textContent = (isA || isB)
+      ? 'Remove from Compare'
+      : ((compareFipsA || compareFipsB) ? 'Add as 2nd County' : 'Add to Compare');
+  }
+
+  mobileCompareBtn.addEventListener('click', function(event){
+    // Without this, the click bubbles to the "tap anywhere on the panel
+    // dismisses it" listener below and closes the panel right away instead
+    // of giving feedback (the button flipping to "Remove from Compare").
+    event.stopPropagation();
+    if (!selectedFips) return;
+    toggleCompareSelection(selectedFips);
+    // Once a second county is added, the interesting result is the chart
+    // down in the comparison panel, not this county's own info -- so close
+    // the sheet and bring the chart into view rather than leaving people to
+    // notice and scroll to it themselves.
+    if (compareFipsA && compareFipsB){
+      hideMobilePanel();
+      comparePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
 
   // Builds both series over whatever slice of the currently selected year
   // span both counties actually have data for, indexed so they "start at
@@ -1420,8 +1487,22 @@ function linearForward(v, s) {
     compareChartWrap.classList.toggle('empty', !hasChart);
     if (!hasChart) return;
 
-    var W = 640, H = 320;
-    var margin = { top: 16, right: 96, bottom: 54, left: 60 };
+    // Size the viewBox to match the chart's actual rendered CSS pixel
+    // width 1:1, rather than a fixed logical canvas (e.g. 640x320) that
+    // then gets uniformly scaled to fit. A fixed canvas looks fine on a
+    // wide desktop panel, but scaling it down to a ~330px phone width
+    // shrinks every label and stroke by the same ratio -- the axis text
+    // ends up a couple of CSS pixels tall and unreadable. Matching the
+    // viewBox to the real width means "11.5px" text really renders at
+    // 11.5 CSS px on any screen.
+    var wrapRect = compareChartWrap.getBoundingClientRect();
+    var W = Math.max(280, Math.round(wrapRect.width) || 640);
+    var narrow = W < 420;
+    var H = narrow ? 260 : 320;
+    compareSvg.style('height', H + 'px');
+    var margin = narrow
+      ? { top: 14, right: 14, bottom: 50, left: 44 }
+      : { top: 16, right: 96, bottom: 54, left: 60 };
     var innerW = W - margin.left - margin.right;
     var innerH = H - margin.top - margin.bottom;
     compareSvg.attr('viewBox', '0 0 ' + W + ' ' + H).attr('preserveAspectRatio', 'xMidYMid meet');
@@ -1496,12 +1577,19 @@ function linearForward(v, s) {
           .attr('stroke-width', 1);
       var lastX = x(data.years[data.years.length - 1]);
       var lastY = y(vals[vals.length - 1]);
-      g.append('text')
+      // On a wide chart there's room to hang the label off the right end of
+      // the line. A narrow (phone-width) chart has little to no margin
+      // there, so anchor the label back over the plot area instead --
+      // otherwise a longer county name runs off the edge of the viewBox
+      // and gets clipped.
+      var label = g.append('text')
         .attr('class', 'compare-end-label')
-        .attr('x', lastX + 8).attr('y', lastY)
+        .attr('y', lastY)
         .attr('dy', '0.32em')
         .attr('fill', color)
         .text(name.split(',')[0]);
+      if (narrow) label.attr('x', lastX - 8).attr('text-anchor', 'end');
+      else label.attr('x', lastX + 8);
     }
     drawSeries(data.a, 'var(--compare-a)', 'a', data.nameA);
     drawSeries(data.b, 'var(--compare-b)', 'b', data.nameB);
@@ -1521,9 +1609,13 @@ function linearForward(v, s) {
 
   function updateCompareHint(data){
     if (!compareFipsA && !compareFipsB){
-      compareHintEl.textContent = 'Click two counties on the map to compare their growth trajectories.';
+      compareHintEl.textContent = MOBILE_MODE
+        ? 'Tap a county, then use "Add to Compare" in its panel. Do that for two counties to compare their growth trajectories.'
+        : 'Click two counties on the map to compare their growth trajectories.';
     } else if (!compareFipsB){
-      compareHintEl.textContent = 'Click a second county to compare.';
+      compareHintEl.textContent = MOBILE_MODE
+        ? 'Tap a second county and add it to compare.'
+        : 'Click a second county to compare.';
     } else if (!data || data.insufficientData){
       compareHintEl.textContent = 'Not enough overlapping data for these two counties in the selected year span.';
     } else if (data.isRaw){
@@ -1534,13 +1626,23 @@ function linearForward(v, s) {
   }
 
   function updateCompareUI(){
-    if (MOBILE_MODE) return;
     updateCompareSlots();
     var data = computeCompareSeries();
     renderCompareChart(data);
     updateCompareSummary(data);
     updateCompareHint(data);
+    updateMobileCompareButton();
   }
+
+  // Chart width is measured from the container at render time, so a resize
+  // or (on mobile) an orientation change needs its own re-render to pick up
+  // the new dimensions -- nothing else naturally triggers one.
+  var compareResizeTimer = null;
+  window.addEventListener('resize', function(){
+    if (!compareFipsA || !compareFipsB) return;
+    clearTimeout(compareResizeTimer);
+    compareResizeTimer = setTimeout(function(){ renderCompareChart(computeCompareSeries()); }, 150);
+  });
 
   if (MOBILE_MODE){
     attachTap(countyPaths);
@@ -1552,10 +1654,6 @@ function linearForward(v, s) {
     document.addEventListener('click', function(event){
       if (selectedFips && !mobilePanel.contains(event.target)) hideMobilePanel();
     });
-    // The comparison chart needs a cursor-driven click-to-select and real
-    // screen width for the line chart; neither holds on touch, so the
-    // whole panel is hidden rather than shipping a half-working version.
-    comparePanel.style.display = 'none';
   } else {
     attachHover(countyPaths);
     attachHover(ctNewPaths);
