@@ -1082,7 +1082,8 @@
   // most of the ramp while a +500% county still reads as more extreme than
   // a +100% one, rather than both maxing out the same color.
   var COLOR_STOPS_T = [-1, -0.55, -0.15, 0, 0.15, 0.55, 1];
-  var COLOR_STOPS_C = ['#5C1A3D', COLOR_DECLINE, '#9C6B57', COLOR_NEUTRAL, '#5B9A82', COLOR_GROWTH, '#D9A441'];
+  var COLOR_STOPS_C = ['#d73027','#fc8d59','#fee08b','#ffffbf','#d9ef8b','#91cf60','#1a9850']
+  //var COLOR_STOPS_C = ['#5C1A3D', COLOR_DECLINE, '#9C6B57', COLOR_NEUTRAL, '#d9c241', '#5B9A82', COLOR_GROWTH];
 
   var colorFromT = d3.scaleLinear()
     .domain(COLOR_STOPS_T)
