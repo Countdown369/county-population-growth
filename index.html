@@ -216,6 +216,17 @@
     vector-effect:non-scaling-stroke;
     pointer-events:none;
   }
+  path.state{
+    stroke:rgba(10,14,20,0.55);
+    stroke-width:0.6;
+    vector-effect:non-scaling-stroke;
+    transition:filter 0.1s ease;
+  }
+  path.state:hover, path.state.hovered{
+    stroke:var(--text);
+    stroke-width:1.4;
+    filter:brightness(1.18);
+  }
 
   .zoom-controls{
     position:absolute;
@@ -321,15 +332,15 @@
   #mobile-panel .mp-compare-btn .dot.dot-a{ background:var(--compare-a); }
   #mobile-panel .mp-compare-btn .dot.dot-b{ background:var(--compare-b); }
 
-  .scale-toggle, .metric-toggle{
+  .scale-toggle, .metric-toggle, .level-toggle{
     display:inline-flex;
     border:1px solid var(--panel-border);
     border-radius:7px;
     overflow:hidden;
     flex-shrink:0;
   }
-  .metric-toggle{ align-self:center; }
-  .scale-btn, .metric-btn{
+  .metric-toggle, .level-toggle{ align-self:center; }
+  .scale-btn, .metric-btn, .level-btn{
     background:none;
     border:none;
     color:var(--text-dim);
@@ -339,8 +350,9 @@
     cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
-  .scale-btn + .scale-btn, .metric-btn + .metric-btn{ border-left:1px solid var(--panel-border); }
-  .scale-btn.active, .metric-btn.active{ background:var(--accent); color:#1A1305; font-weight:600; }
+  .scale-btn + .scale-btn, .metric-btn + .metric-btn, .level-btn + .level-btn{ border-left:1px solid var(--panel-border); }
+  .scale-btn.active, .metric-btn.active, .level-btn.active{ background:var(--accent); color:#1A1305; font-weight:600; }
+  .level-toggle{ border-color:var(--compare-b); }
   .scale-note{
     flex-basis:100%;
     font-size:11.5px;
@@ -467,6 +479,9 @@
   .county.compare-a{ stroke:var(--compare-a); stroke-width:2.4; }
   .county.compare-b{ stroke:var(--compare-b); stroke-width:2.4; }
   .county.compare-a:hover, .county.compare-b:hover{ stroke-width:2.8; }
+  path.state.compare-a{ stroke:var(--compare-a); stroke-width:2.6; }
+  path.state.compare-b{ stroke:var(--compare-b); stroke-width:2.6; }
+  path.state.compare-a:hover, path.state.compare-b:hover{ stroke-width:3; }
 
   #tooltip{
     position:fixed;
@@ -582,7 +597,7 @@
 
   <header class="top">
     <h1>US County Population Atlas</h1>
-    <p class="sub" id="subtitle">Drag the handles below to pick a year span. Every county recolors by its population change across that span &mdash; toggle between percent and raw change above &mdash; US Census Bureau county population estimates.</p>
+    <p class="sub" id="subtitle">Drag the handles below to choose a year span. Toggle between percent and raw change. US Census Bureau county population estimates.</p>
   </header>
 
   <div class="hero-row">
@@ -590,13 +605,17 @@
       <div class="value flat" id="hero-median">&mdash;</div>
       <div class="label" id="hero-median-label">Median % change</div>
     </div>
+    <div class="level-toggle" role="group" aria-label="Geography level">
+      <button type="button" class="level-btn active" data-level="county">County Mode</button>
+      <button type="button" class="level-btn" data-level="state">State Mode</button>
+    </div>
     <div class="metric-toggle" role="group" aria-label="Population change metric">
       <button type="button" class="metric-btn active" data-metric="pct">% Change</button>
       <button type="button" class="metric-btn" data-metric="raw">Raw Change</button>
     </div>
     <div class="hero-sub">
-      <span class="grow-count"><b id="hero-grow-count">&mdash;</b> counties grew</span>
-      <span class="shrink-count"><b id="hero-shrink-count">&mdash;</b> counties shrank</span>
+      <span class="grow-count"><b id="hero-grow-count">&mdash;</b> <span id="hero-grow-label">counties grew</span></span>
+      <span class="shrink-count"><b id="hero-shrink-count">&mdash;</b> <span id="hero-shrink-label">counties shrank</span></span>
       <span><b id="hero-nodata-count">&mdash;</b> no data for this span</span>
     </div>
   </div>
@@ -651,7 +670,7 @@
   <div class="compare-panel" id="compare-panel">
     <div class="compare-header">
       <div>
-        <h2>Compare Two Counties</h2>
+        <h2 id="compare-title">Compare Two Counties</h2>
         <p class="compare-hint" id="compare-hint">Click two counties on the map to compare their growth trajectories.</p>
       </div>
       <button type="button" class="compare-clear" id="compare-clear">Clear</button>
@@ -671,9 +690,13 @@
   <footer class="notes">
     Source: US Census Bureau Population Estimates Program.
     <br><br>
-    Connecticut's eight historical counties were replaced by nine planning regions in 2022, so spans that start at-or-before 2019 and end at-or-after 2020 can't compute figures for Connecticut and show as no-data.
+    State Mode totals each state's population from its own counties at the start and end year, then computes that state's percent/raw change from those totals. The color scale and legend rescale to the state-level range whenever State Mode is active.
+    <br><br>
+    Connecticut's eight historical counties were replaced by nine planning regions in 2022, so at the county level, spans that start at-or-before 2019 and end at-or-after 2020 can't compute figures for Connecticut and show as no-data (State Mode isn't affected by this).
     <br>
     Alaska's Chugach and Copper River Census Areas are mapped using their former combined Valdez&ndash;Cordova boundary, which the Census Bureau split in 2019. Due to other changes in Alaska's Census Area boundaries, only partial data for the state is available before 2000.
+    <br>
+    Colorado's Broomfield County was created in 2001 out of parts of Adams, Boulder, Jefferson, and Weld counties.
     <br><br>
     Contact me: brown dot co at $champions_of_the_70th_Beanpot dot edu
   </footer>
@@ -785,13 +808,16 @@
     var yearColsSorted = years.map(function(y){ return 'POPESTIMATE' + y; });
 
     var counties = {};
+    var states = {}; // stateFips -> state name, gathered alongside the county rows so
+                      // State Mode has display names without a second pass over the CSV
     for (var i = 0; i < rows.length; i++){
       var row = rows[i];
       if (String(row.SUMLEV).trim() !== '50') continue; // county-level rows only
       var stateFips = String(row.STATE).trim().padStart(2, '0');
       var countyFips = String(row.COUNTY).trim().padStart(3, '0');
       var fips = stateFips + countyFips;
-      var name = (row.CTYNAME || '').trim() + ', ' + (row.STNAME || '').trim();
+      var stName = (row.STNAME || '').trim();
+      var name = (row.CTYNAME || '').trim() + ', ' + stName;
       var p = yearColsSorted.map(function(col){
         var v = row[col];
         if (v === undefined || v === null) return null;
@@ -801,8 +827,9 @@
         return isNaN(num) ? null : Math.round(num);
       });
       counties[fips] = { n: name, p: p };
+      if (stName && !states[stateFips]) states[stateFips] = stName;
     }
-    return { years: years, counties: counties };
+    return { years: years, counties: counties, states: states };
   }
 
   // ============================================================
@@ -813,6 +840,7 @@
   var YEARS = popData.years;
   var NUM_YEARS = YEARS.length;
   var countiesById = popData.counties;
+  var stateNamesByFips = popData.states || {};
 
   document.getElementById('subtitle').textContent =
     'Drag the handles below to choose a year span. Toggle between percent and raw change. US Census Bureau county population estimates, ' + YEARS[0] + '\u2013' + YEARS[YEARS.length-1] + '.';
@@ -832,10 +860,116 @@
   var OLD_CT_FIPS = ['09001','09003','09005','09007','09009','09011','09013','09015'];
   var OLD_CT_SET = new Set(OLD_CT_FIPS);
 
+  // County FIPS codes that were created (or retired) by splitting/merging
+  // *existing* counties within the same state -- no population was gained
+  // or lost by the state as a whole, just redrawn between counties. Unlike
+  // Connecticut's wholesale county->planning-region swap above (where the
+  // old and new geographies don't overlap and genuinely can't both be
+  // summed), these are single counties missing data only outside the years
+  // they existed, while their sibling counties cover the same ground for
+  // those years. So in State Mode they shouldn't blank out the whole
+  // state's total the way an ordinary missing county would -- they just
+  // contribute nothing for the years they didn't exist, since that
+  // population is already accounted for in the counties they were carved
+  // from (or merged into).
+  //
+  // Broomfield County, CO (FIPS 08014) was consolidated on Nov 15, 2001 out
+  // of parts of Adams (08001), Boulder (08013), Jefferson (08059), and Weld
+  // (08123) counties. The Census Bureau's population figures for those four
+  // counties already reflect the population "lost" to Broomfield from that
+  // point on, so summing whatever subset of the five has data for a given
+  // year still reconstructs Colorado's true total for that year.
+  var STATE_NEUTRAL_SPLIT_FIPS = new Set(['08014']);
+
   // ---- geometry ----
   var geo = topojson.feature(topoData, topoData.objects.counties);
   var stateMesh = topojson.mesh(topoData, topoData.objects.states, function(a,b){ return a !== b; });
   var path = d3.geoPath(); // coordinates already projected (Albers USA composite)
+
+  // State Mode needs actual fillable state polygons, not just the border
+  // mesh above. topoData.objects.states carries one Polygon/MultiPolygon
+  // geometry per state (same source object the mesh is built from), with
+  // .id equal to the 2-digit state FIPS -- mirroring how county .id is the
+  // 5-digit county FIPS. Guarded because this is a reasonable assumption
+  // about the topology file's shape, not a hard guarantee.
+  var stateGeo = null;
+  var STATE_MODE_AVAILABLE = false;
+  try {
+    stateGeo = topojson.feature(topoData, topoData.objects.states);
+    STATE_MODE_AVAILABLE = !!(stateGeo && stateGeo.features && stateGeo.features.length);
+  } catch (e){
+    console.warn('State Mode unavailable: could not build state geometry from topology.json', e);
+  }
+  function stateFipsOf(d){ return String(d.id).padStart(2, '0'); }
+
+  // ---- per-year state population series (for Compare Two States) ----
+  // The comparison chart needs a value for *every* year in the span, not
+  // just the two endpoints the choropleth cares about, so this rebuilds the
+  // same "sum this state's counties, honoring the Broomfield/CT quirks"
+  // logic as computeAndRender's state aggregation, but year-by-year across
+  // the whole YEARS range instead of just at si/ei.
+  //
+  // Connecticut is the one place the *set* of counties belonging to a state
+  // actually changes over time (old counties pre-2020, new planning
+  // regions 2020+), so which feature list represents "Connecticut" has to
+  // be picked per year rather than once. Every other state's county list is
+  // constant, so it's grouped once up front instead of re-filtered per year.
+  var countyFeaturesByState = new Map(); // state fips -> geo.features belonging to it
+  geo.features.forEach(function(d){
+    var st = String(d.id).slice(0, 2);
+    if (!countyFeaturesByState.has(st)) countyFeaturesByState.set(st, []);
+    countyFeaturesByState.get(st).push(d);
+  });
+
+  function countyFeaturesForStateYear(stFips, year){
+    if (stFips === '09' && year >= 2020) return ctNewGeo.features;
+    return countyFeaturesByState.get(stFips) || [];
+  }
+
+  // Sums a list of county features' population at a single year index,
+  // applying the same neutral-split exception (e.g. Broomfield) used
+  // everywhere else. Returns null -- rather than a number -- if the total
+  // is unknown for that year, i.e. some non-exempt county in the list is
+  // missing data, so callers can tell "zero people" apart from "no data".
+  function sumCountyFeaturesAtYearIndex(features, yi){
+    var sum = 0;
+    for (var k = 0; k < features.length; k++){
+      var fips = features[k].id;
+      var isNeutralSplit = STATE_NEUTRAL_SPLIT_FIPS.has(fips);
+      var rec = countiesById[fips];
+      if (!rec){
+        if (isNeutralSplit) continue;
+        return null;
+      }
+      var p = rec.p[yi];
+      if (p == null || p === 0){
+        if (isNeutralSplit) continue;
+        return null;
+      }
+      sum += p;
+    }
+    return sum;
+  }
+
+  function computeStatePopulationSeries(stFips){
+    var series = new Array(NUM_YEARS).fill(null);
+    for (var yi = 0; yi < NUM_YEARS; yi++){
+      series[yi] = sumCountyFeaturesAtYearIndex(countyFeaturesForStateYear(stFips, YEARS[yi]), yi);
+    }
+    return series;
+  }
+
+  // A state's population series only depends on the static source data, not
+  // on the currently selected span or metric, so it's cheap to memoize the
+  // first time each state is picked for comparison.
+  var statePseudoRecordCache = new Map();
+  function getStatePseudoRecord(stFips){
+    if (!stFips) return null;
+    if (statePseudoRecordCache.has(stFips)) return statePseudoRecordCache.get(stFips);
+    var rec = { n: stateNamesByFips[stFips] || ('State ' + stFips), p: computeStatePopulationSeries(stFips) };
+    statePseudoRecordCache.set(stFips, rec);
+    return rec;
+  }
 
   var bbox = topoData.bbox;
   var pad = 14;
@@ -846,8 +980,14 @@
   var MOBILE_MODE = !!(window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches);
   if (MOBILE_MODE){
     document.getElementById('map-wrap').classList.add('mobile-mode');
-    document.getElementById('compare-placeholder').textContent =
-      'Tap a county on the map above, then use "Toggle Compare" in its panel. Do that for a second county to see the chart here.';
+  }
+
+  var stateLevelBtn = document.querySelector('.level-btn[data-level="state"]');
+  if (!STATE_MODE_AVAILABLE && stateLevelBtn){
+    stateLevelBtn.disabled = true;
+    stateLevelBtn.title = 'State Mode unavailable: no state geometry found in topology.json';
+    stateLevelBtn.style.opacity = '0.4';
+    stateLevelBtn.style.cursor = 'not-allowed';
   }
 
   var svg = d3.select('#map-svg').attr('viewBox', vbX+' '+vbY+' '+vbW+' '+vbH);
@@ -868,6 +1008,17 @@
       .attr('d', path)
       .attr('data-fips', function(d){ return d.id; })
       .style('display', 'none');
+
+  var gStates = gZoom.append('g').attr('class','states-g');
+  var statePaths = STATE_MODE_AVAILABLE
+    ? gStates.selectAll('path.state')
+        .data(stateGeo.features)
+        .join('path')
+          .attr('class','state')
+          .attr('d', path)
+          .attr('data-fips', stateFipsOf)
+          .style('display', 'none')
+    : gStates.selectAll('path.state').data([]).join('path');
 
   gZoom.append('path')
     .attr('class','state-borders')
@@ -1047,53 +1198,120 @@ function linearForward(v, s) {
   // ---- state ----
   var startIdx = 0, endIdx = NUM_YEARS - 1;
   var currentStart = YEARS[startIdx], currentEnd = YEARS[endIdx];
-  var pctByFips = new Map();
+  var pctByFips = new Map();   // county fips -> { pct, raw, pStart, pEnd, name }
+  var pctByState = new Map();  // 2-digit state fips -> { pct, raw, pStart, pEnd, name }
+  var levelMode = 'county';    // 'county' | 'state' -- which layer/stats currently drive the map
+
+  // Figures out which set of county-level features are "active" for a given
+  // start year (handling the 2020 old-counties/new-CT-planning-regions
+  // swap). Used for County Mode's own rendering/stats, where a single
+  // county tile has to pick one feature set for the whole span. State
+  // Mode's aggregation (below) doesn't use this -- it picks a feature set
+  // per *endpoint year* instead, via countyFeaturesForStateYear.
+  function getActiveCountyFeatures(startYear){
+    var useNewCT = startYear >= 2020;
+    var features = geo.features.filter(function(d){
+      return !(useNewCT && OLD_CT_SET.has(d.id));
+    });
+    if (useNewCT) features = features.concat(ctNewGeo.features);
+    return { useNewCT: useNewCT, features: features };
+  }
 
   function computeAndRender(startYear, endYear){
     currentStart = startYear; currentEnd = endYear;
     var si = YEARS.indexOf(startYear), ei = YEARS.indexOf(endYear);
 
-    var useNewCT = startYear >= 2020;
+    var activeInfo = getActiveCountyFeatures(startYear);
+    var useNewCT = activeInfo.useNewCT;
+    var activeFeatures = activeInfo.features;
+    var showCounties = levelMode === 'county';
+
     countyPaths.style('display', function(d){
-      return (useNewCT && OLD_CT_SET.has(d.id)) ? 'none' : null;
+      return (showCounties && !(useNewCT && OLD_CT_SET.has(d.id))) ? null : 'none';
     });
-    ctNewPaths.style('display', useNewCT ? null : 'none');
+    ctNewPaths.style('display', (showCounties && useNewCT) ? null : 'none');
+    statePaths.style('display', (!showCounties && STATE_MODE_AVAILABLE) ? null : 'none');
 
+    // ---- county-level figures (always computed: County Mode uses them
+    // directly, State Mode aggregates from them, and the county-comparison
+    // panel needs them regardless of which layer is on screen) ----
     pctByFips.clear();
-    var valid = [];
-    var noDataCount = 0;
-    var activeFeatures = geo.features.filter(function(d){
-      return !(useNewCT && OLD_CT_SET.has(d.id));
-    });
-    if (useNewCT) activeFeatures = activeFeatures.concat(ctNewGeo.features);
-
+    var validCounty = [];
+    var noDataCountyCount = 0;
     activeFeatures.forEach(function(d){
       var fips = d.id;
       var rec = countiesById[fips];
-      if (!rec){ noDataCount++; return; }
+      if (!rec){ noDataCountyCount++; return; }
       var pStart = rec.p[si], pEnd = rec.p[ei];
-      if (pStart == null || pEnd == null || pStart === 0){ noDataCount++; return; }
+      if (pStart == null || pEnd == null || pStart === 0){ noDataCountyCount++; return; }
       var pct = (pEnd - pStart) / pStart * 100;
       var raw = pEnd - pStart;
       pctByFips.set(fips, { pct: pct, raw: raw, pStart: pStart, pEnd: pEnd, name: rec.n });
-      valid.push(metricMode === 'raw' ? raw : pct);
+      validCounty.push(metricMode === 'raw' ? raw : pct);
     });
+
+    // ---- state-level aggregation: total each state's population at the
+    // start year and end year INDEPENDENTLY -- each endpoint uses whichever
+    // set of counties actually existed/reported for THAT year (see
+    // countyFeaturesForStateYear) -- then derive that state's own pct/raw
+    // change from the two totals (weighted by county size, matching how
+    // the Census itself would total a state).
+    //
+    // Picking the feature set per endpoint, rather than once for the whole
+    // span the way County Mode's rendering above does, is what lets a span
+    // crossing Connecticut's 2020 swap from eight counties to nine planning
+    // regions still total correctly: every individual Connecticut county
+    // changed, but the state's overall population is still comparable
+    // across that swap, so it shouldn't blank out in State Mode the way it
+    // necessarily does at the county level. Alaska is different -- it only
+    // ever has one feature set (countyFeaturesForStateYear has no special
+    // case for it), so its genuine pre-2000 data gaps still propagate to
+    // no-data here exactly as they do at the county level.
+    pctByState.clear();
+    var validState = [];
+    var noDataStateCount = 0;
+    countyFeaturesByState.forEach(function(_unused, stFips){
+      var sumStart = sumCountyFeaturesAtYearIndex(countyFeaturesForStateYear(stFips, startYear), si);
+      var sumEnd = sumCountyFeaturesAtYearIndex(countyFeaturesForStateYear(stFips, endYear), ei);
+      if (sumStart == null || sumEnd == null || sumStart === 0){ noDataStateCount++; return; }
+      var pct = (sumEnd - sumStart) / sumStart * 100;
+      var raw = sumEnd - sumStart;
+      var name = stateNamesByFips[stFips] || ('State ' + stFips);
+      pctByState.set(stFips, { pct: pct, raw: raw, pStart: sumStart, pEnd: sumEnd, name: name });
+      validState.push(metricMode === 'raw' ? raw : pct);
+    });
+
+    // Whichever level is on screen supplies the values that drive the color
+    // scale and hero stats -- state-level totals are far fewer and far less
+    // extreme than county-level ones (aggregation smooths out small-county
+    // outliers), so re-deriving stats here is what rescales the choropleth
+    // and legend to the new range instead of leaving 50 states bunched in
+    // the middle of a scale still calibrated for ~3,100 counties.
+    var valid = showCounties ? validCounty : validState;
+    var noDataCount = showCounties ? noDataCountyCount : noDataStateCount;
 
     var stats = computeScaleStats(valid, metricMode);
 
-    var fillFn = function(d){
+    var countyFillFn = function(d){
       var rec = pctByFips.get(d.id);
       if (!rec) return COLOR_NODATA;
       return colorForValue(metricMode === 'raw' ? rec.raw : rec.pct, stats);
     };
-    countyPaths.attr('fill', fillFn);
-    ctNewPaths.attr('fill', fillFn);
+    var stateFillFn = function(d){
+      var rec = pctByState.get(stateFipsOf(d));
+      if (!rec) return COLOR_NODATA;
+      return colorForValue(metricMode === 'raw' ? rec.raw : rec.pct, stats);
+    };
+    countyPaths.attr('fill', countyFillFn);
+    ctNewPaths.attr('fill', countyFillFn);
+    if (STATE_MODE_AVAILABLE) statePaths.attr('fill', stateFillFn);
 
     renderLegend(stats, metricMode);
 
+    var unitPlural = showCounties ? 'counties' : 'states';
     var heroEl = document.getElementById('hero-median');
     document.getElementById('hero-median-label').textContent =
-      metricMode === 'raw' ? 'Median raw change' : 'Median % change';
+      (metricMode === 'raw' ? 'Median raw change' : 'Median % change') + (showCounties ? '' : '');
     if (valid.length){
       var sorted = valid.slice().sort(function(a,b){ return a-b; });
       var mid = Math.floor(sorted.length/2);
@@ -1110,11 +1328,21 @@ function linearForward(v, s) {
     document.getElementById('hero-grow-count').textContent = fmtInt(growCount);
     document.getElementById('hero-shrink-count').textContent = fmtInt(shrinkCount);
     document.getElementById('hero-nodata-count').textContent = fmtInt(noDataCount);
+    document.getElementById('hero-grow-label').textContent = unitPlural + ' grew';
+    document.getElementById('hero-shrink-label').textContent = unitPlural + ' shrank';
 
     if (MOBILE_MODE && selectedFips){
-      var selFeature = activeFeatures.filter(function(f){ return f.id === selectedFips; })[0];
-      if (selFeature) mobilePanelContent.innerHTML = infoHtml(selFeature);
-      else hideMobilePanel();
+      if (selectedLevel === 'state'){
+        var selStateFeature = STATE_MODE_AVAILABLE
+          ? stateGeo.features.filter(function(f){ return stateFipsOf(f) === selectedFips; })[0]
+          : null;
+        if (selStateFeature) mobilePanelContent.innerHTML = infoHtmlState(selStateFeature);
+        else hideMobilePanel();
+      } else {
+        var selFeature = activeFeatures.filter(function(f){ return f.id === selectedFips; })[0];
+        if (selFeature) mobilePanelContent.innerHTML = infoHtmlCounty(selFeature);
+        else hideMobilePanel();
+      }
     }
 
     // Keep the two-county comparison (span- and metric-dependent) in sync
@@ -1282,7 +1510,7 @@ function linearForward(v, s) {
   // the bottom of the screen that stays put until it's dismissed.
   var tooltip = d3.select('#tooltip');
 
-  function infoHtml(d){
+  function infoHtmlCounty(d){
     var rec = pctByFips.get(d.id);
     if (!rec){
       var fallback = countiesById[d.id];
@@ -1297,8 +1525,23 @@ function linearForward(v, s) {
       + '<div class="tt-pct '+(headlineVal>=0?'up':'down')+'">'+headlineText+'</div>';
   }
 
-  function showTooltip(event, d){
-    tooltip.html(infoHtml(d)).style('opacity', 1);
+  function infoHtmlState(d){
+    var fips = stateFipsOf(d);
+    var rec = pctByState.get(fips);
+    if (!rec){
+      var name = stateNamesByFips[fips] || 'Unknown state';
+      return '<div class="tt-name">'+name+'</div><div class="tt-nodata">No data for this span</div>';
+    }
+    var headlineVal = metricMode === 'raw' ? rec.raw : rec.pct;
+    var headlineText = metricMode === 'raw' ? fmtRaw(rec.raw) : fmtPct(rec.pct);
+    return '<div class="tt-name">'+rec.name+'</div>'
+      + '<div class="tt-row"><span>'+currentStart+'</span><span>'+fmtInt(rec.pStart)+'</span></div>'
+      + '<div class="tt-row"><span>'+currentEnd+'</span><span>'+fmtInt(rec.pEnd)+'</span></div>'
+      + '<div class="tt-pct '+(headlineVal>=0?'up':'down')+'">'+headlineText+'</div>';
+  }
+
+  function showTooltip(event, html){
+    tooltip.html(html).style('opacity', 1);
     positionTooltip(event);
   }
 
@@ -1310,65 +1553,95 @@ function linearForward(v, s) {
     tooltip.style('left', (x+16)+'px').style('top', (y+16)+'px');
   }
 
-  function attachHover(selection){
+  function attachHover(selection, infoFn){
     selection
-      .on('pointerenter', function(event, d){ d3.select(this).classed('hovered', true); showTooltip(event, d); })
-      .on('pointermove', function(event, d){ showTooltip(event, d); })
+      .on('pointerenter', function(event, d){ d3.select(this).classed('hovered', true); showTooltip(event, infoFn(d)); })
+      .on('pointermove', function(event, d){ showTooltip(event, infoFn(d)); })
       .on('pointerleave', function(){ d3.select(this).classed('hovered', false); tooltip.style('opacity', 0); });
   }
 
   var mobilePanel = document.getElementById('mobile-panel');
   var mobilePanelContent = document.getElementById('mobile-panel-content');
   var selectedFips = null;
+  var selectedLevel = null; // 'county' | 'state' -- which kind of feature selectedFips refers to
 
-  function showMobilePanel(d){
-    selectedFips = d.id;
-    mobilePanelContent.innerHTML = infoHtml(d);
+  function showMobilePanel(d, level){
+    selectedLevel = level;
+    selectedFips = level === 'state' ? stateFipsOf(d) : d.id;
+    mobilePanelContent.innerHTML = level === 'state' ? infoHtmlState(d) : infoHtmlCounty(d);
     mobilePanel.classList.add('visible');
-    countyPaths.classed('hovered', function(dd){ return dd.id === selectedFips; });
-    ctNewPaths.classed('hovered', function(dd){ return dd.id === selectedFips; });
+    if (level === 'state'){
+      statePaths.classed('hovered', function(dd){ return stateFipsOf(dd) === selectedFips; });
+      countyPaths.classed('hovered', false);
+      ctNewPaths.classed('hovered', false);
+    } else {
+      countyPaths.classed('hovered', function(dd){ return dd.id === selectedFips; });
+      ctNewPaths.classed('hovered', function(dd){ return dd.id === selectedFips; });
+      statePaths.classed('hovered', false);
+    }
+    mobileCompareBtn.style.display = '';
+    updateMobileCompareButton();
   }
 
   function hideMobilePanel(){
     selectedFips = null;
+    selectedLevel = null;
     mobilePanel.classList.remove('visible');
     countyPaths.classed('hovered', false);
     ctNewPaths.classed('hovered', false);
+    statePaths.classed('hovered', false);
   }
 
   document.getElementById('mobile-panel-close').addEventListener('click', hideMobilePanel);
-  // The panel commonly covers the very county that opened it (it's short
-  // dock at the bottom of a small screen), so a second tap "in the same
-  // spot" lands on the panel, not the map underneath. Treat any tap on the
-  // panel as a dismiss too, not just the close button, so that still works.
+  // The panel commonly covers the very county/state that opened it (it's a
+  // short dock at the bottom of a small screen), so a second tap "in the
+  // same spot" lands on the panel, not the map underneath. Treat any tap on
+  // the panel as a dismiss too, not just the close button, so that still works.
   mobilePanel.addEventListener('click', hideMobilePanel);
 
-  function attachTap(selection){
+  function attachTap(selection, level){
     selection.on('click', function(event, d){
       event.stopPropagation();
-      if (selectedFips === d.id){ hideMobilePanel(); return; }
-      showMobilePanel(d);
+      var id = level === 'state' ? stateFipsOf(d) : d.id;
+      if (selectedFips === id && selectedLevel === level){ hideMobilePanel(); return; }
+      showMobilePanel(d, level);
     });
   }
 
-  // ---- compare two counties (desktop + mobile) ----
-  // Desktop has no other use for a plain click on a county (hover already
-  // drives the tooltip), so clicking becomes "select for comparison" there
-  // (attachCompareClick, below). Touch devices need tap for the info panel
-  // instead, so on mobile the comparison is driven by an explicit "Add to
-  // Compare" button inside that panel (see mobileCompareBtn) rather than
-  // the tap itself -- both paths funnel into the same toggleCompareSelection().
+  // ---- compare two counties / two states (desktop + mobile) ----
+  // Desktop has no other use for a plain click on a county or state (hover
+  // already drives the tooltip), so clicking becomes "select for
+  // comparison" there (attachCompareClick, below). Touch devices need tap
+  // for the info panel instead, so on mobile the comparison is driven by an
+  // explicit "Toggle Compare" button inside that panel (see
+  // mobileCompareBtn) rather than the tap itself -- both paths funnel into
+  // the same toggleCompareSelection().
+  //
+  // County and state comparisons are tracked as two independent pairs
+  // (compareFipsA/B vs. compareStateA/B) rather than one shared pair, so
+  // switching between County Mode and State Mode doesn't clobber whatever
+  // you'd already picked in the other mode -- flip back and it's still there.
   var comparePanel = document.getElementById('compare-panel');
-  var compareFipsA = null, compareFipsB = null;
+  var compareFipsA = null, compareFipsB = null;   // County Mode pair
+  var compareStateA = null, compareStateB = null; // State Mode pair
   var compareSvg = d3.select('#compare-svg');
   var compareChartWrap = document.getElementById('compare-chart-wrap');
+  var compareTitleEl = document.getElementById('compare-title');
   var compareHintEl = document.getElementById('compare-hint');
+  var comparePlaceholderEl = document.getElementById('compare-placeholder');
   var compareSummaryEl = document.getElementById('compare-summary');
   var compareSlotA = document.getElementById('compare-slot-a');
   var compareSlotB = document.getElementById('compare-slot-b');
 
-  function countyDisplayName(fips){
-    var rec = countiesById[fips];
+  function compareLevelNow(){ return levelMode === 'state' ? 'state' : 'county'; }
+  function getCompareA(){ return compareLevelNow() === 'state' ? compareStateA : compareFipsA; }
+  function getCompareB(){ return compareLevelNow() === 'state' ? compareStateB : compareFipsB; }
+  function setCompareA(v){ if (compareLevelNow() === 'state') compareStateA = v; else compareFipsA = v; }
+  function setCompareB(v){ if (compareLevelNow() === 'state') compareStateB = v; else compareFipsB = v; }
+
+  function compareEntityName(id, level){
+    if (level === 'state') return stateNamesByFips[id] || 'Unknown state';
+    var rec = countiesById[id];
     return rec ? rec.n : 'Unknown county';
   }
 
@@ -1379,38 +1652,53 @@ function linearForward(v, s) {
     ctNewPaths
       .classed('compare-a', function(d){ return d.id === compareFipsA; })
       .classed('compare-b', function(d){ return d.id === compareFipsB; });
+    if (STATE_MODE_AVAILABLE){
+      statePaths
+        .classed('compare-a', function(d){ return stateFipsOf(d) === compareStateA; })
+        .classed('compare-b', function(d){ return stateFipsOf(d) === compareStateB; });
+    }
   }
 
-  function toggleCompareSelection(fips){
-    if (fips === compareFipsA){ compareFipsA = null; }
-    else if (fips === compareFipsB){ compareFipsB = null; }
-    else if (!compareFipsA){ compareFipsA = fips; }
-    else if (!compareFipsB){ compareFipsB = fips; }
-    else { compareFipsA = compareFipsB; compareFipsB = fips; } // rotate: newest click bumps the older slot
+  function toggleCompareSelection(id, level){
+    level = level || compareLevelNow();
+    var a = level === 'state' ? compareStateA : compareFipsA;
+    var b = level === 'state' ? compareStateB : compareFipsB;
+    if (id === a){ a = null; }
+    else if (id === b){ b = null; }
+    else if (!a){ a = id; }
+    else if (!b){ b = id; }
+    else { a = b; b = id; } // rotate: newest pick bumps the older slot
+    if (level === 'state'){ compareStateA = a; compareStateB = b; }
+    else { compareFipsA = a; compareFipsB = b; }
     applyCompareHighlight();
     updateCompareUI();
   }
 
-  function attachCompareClick(selection){
-    selection.on('click', function(event, d){ toggleCompareSelection(d.id); });
+  function attachCompareClick(selection, level){
+    selection.on('click', function(event, d){
+      var id = level === 'state' ? stateFipsOf(d) : d.id;
+      toggleCompareSelection(id, level);
+    });
   }
 
   function clearCompareSelection(){
-    compareFipsA = null; compareFipsB = null;
+    setCompareA(null); setCompareB(null);
     applyCompareHighlight();
     updateCompareUI();
   }
 
   document.getElementById('compare-clear').addEventListener('click', clearCompareSelection);
-  compareSlotA.addEventListener('click', function(){ if (compareFipsA){ compareFipsA = null; applyCompareHighlight(); updateCompareUI(); } });
-  compareSlotB.addEventListener('click', function(){ if (compareFipsB){ compareFipsB = null; applyCompareHighlight(); updateCompareUI(); } });
+  compareSlotA.addEventListener('click', function(){ if (getCompareA()){ setCompareA(null); applyCompareHighlight(); updateCompareUI(); } });
+  compareSlotB.addEventListener('click', function(){ if (getCompareB()){ setCompareB(null); applyCompareHighlight(); updateCompareUI(); } });
 
   function updateCompareSlots(){
-    var placeholder = MOBILE_MODE ? 'Tap a county\u2026' : 'Click a county\u2026';
-    compareSlotA.querySelector('.slot-name').textContent = compareFipsA ? countyDisplayName(compareFipsA) : placeholder;
-    compareSlotA.classList.toggle('filled', !!compareFipsA);
-    compareSlotB.querySelector('.slot-name').textContent = compareFipsB ? countyDisplayName(compareFipsB) : placeholder;
-    compareSlotB.classList.toggle('filled', !!compareFipsB);
+    var level = compareLevelNow();
+    var idA = getCompareA(), idB = getCompareB();
+    var placeholder = (MOBILE_MODE ? 'Tap a ' : 'Click a ') + level + '\u2026';
+    compareSlotA.querySelector('.slot-name').textContent = idA ? compareEntityName(idA, level) : placeholder;
+    compareSlotA.classList.toggle('filled', !!idA);
+    compareSlotB.querySelector('.slot-name').textContent = idB ? compareEntityName(idB, level) : placeholder;
+    compareSlotB.classList.toggle('filled', !!idB);
   }
 
   // ---- mobile "Toggle Compare" button (lives inside the tap-to-open info
@@ -1424,12 +1712,15 @@ function linearForward(v, s) {
 
   function updateMobileCompareButton(){
     if (!selectedFips) return;
-    var isA = selectedFips === compareFipsA, isB = selectedFips === compareFipsB;
+    var isA, isB;
+    if (selectedLevel === 'state'){
+      isA = selectedFips === compareStateA; isB = selectedFips === compareStateB;
+    } else {
+      isA = selectedFips === compareFipsA; isB = selectedFips === compareFipsB;
+    }
     mobileCompareDot.className = 'dot' + (isA ? ' dot-a' : isB ? ' dot-b' : '');
     mobileCompareBtn.classList.toggle('active', isA || isB);
-    mobileCompareLabel.textContent = (isA || isB)
-      ? 'Toggle Compare'
-      : ((compareFipsA || compareFipsB) ? 'Toggle Compare' : 'Toggle Compare');
+    mobileCompareLabel.textContent = 'Toggle Compare';
   }
 
   mobileCompareBtn.addEventListener('click', function(event){
@@ -1438,26 +1729,31 @@ function linearForward(v, s) {
     // of giving feedback (the button flipping to "Remove from Compare").
     event.stopPropagation();
     if (!selectedFips) return;
-    toggleCompareSelection(selectedFips);
-    // Once a second county is added, the interesting result is the chart
-    // down in the comparison panel, not this county's own info -- so close
-    // the sheet and bring the chart into view rather than leaving people to
-    // notice and scroll to it themselves.
-    if (compareFipsA && compareFipsB){
+    var level = selectedLevel;
+    toggleCompareSelection(selectedFips, level);
+    // Once a second county/state is added, the interesting result is the
+    // chart down in the comparison panel, not this feature's own info -- so
+    // close the sheet and bring the chart into view rather than leaving
+    // people to notice and scroll to it themselves.
+    var bothFilled = level === 'state' ? (compareStateA && compareStateB) : (compareFipsA && compareFipsB);
+    if (bothFilled){
       hideMobilePanel();
       comparePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   });
 
   // Builds both series over whatever slice of the currently selected year
-  // span both counties actually have data for, indexed so they "start at
-  // the same point": population/baseline*100 in % mode (baseline = 100,
-  // always positive so a log y-axis works), or population-minus-baseline
-  // in raw mode (baseline = 0, but raw change can go negative on a decline,
-  // so log is impossible there and we fall back to a linear axis instead).
+  // span both counties/states actually have data for, indexed so they
+  // "start at the same point": population/baseline*100 in % mode (baseline
+  // = 100, always positive so a log y-axis works), or population-minus-
+  // baseline in raw mode (baseline = 0, but raw change can go negative on a
+  // decline, so log is impossible there and we fall back to a linear axis).
   function computeCompareSeries(){
-    if (!compareFipsA || !compareFipsB) return null;
-    var recA = countiesById[compareFipsA], recB = countiesById[compareFipsB];
+    var level = compareLevelNow();
+    var idA = getCompareA(), idB = getCompareB();
+    if (!idA || !idB) return null;
+    var recA = level === 'state' ? getStatePseudoRecord(idA) : countiesById[idA];
+    var recB = level === 'state' ? getStatePseudoRecord(idB) : countiesById[idB];
     if (!recA || !recB) return { insufficientData: true };
     var si = YEARS.indexOf(currentStart), ei = YEARS.indexOf(currentEnd);
     if (si === -1) si = 0;
@@ -1608,16 +1904,20 @@ function linearForward(v, s) {
   }
 
   function updateCompareHint(data){
-    if (!compareFipsA && !compareFipsB){
+    var level = compareLevelNow();
+    var idA = getCompareA(), idB = getCompareB();
+    var noun = level === 'state' ? 'state' : 'county';
+    var nounPlural = level === 'state' ? 'states' : 'counties';
+    if (!idA && !idB){
       compareHintEl.textContent = MOBILE_MODE
-        ? 'Tap a county, then use "Toggle Compare" in its panel. Do that for two counties to compare their growth trajectories.'
-        : 'Click two counties on the map to compare their growth trajectories.';
-    } else if (!compareFipsB){
+        ? 'Tap a ' + noun + ', then use "Toggle Compare" in its panel. Do that for two ' + nounPlural + ' to compare their growth trajectories.'
+        : 'Click two ' + nounPlural + ' on the map to compare their growth trajectories.';
+    } else if (!idB){
       compareHintEl.textContent = MOBILE_MODE
-        ? 'Tap a second county and add it to compare.'
-        : 'Click a second county to compare.';
+        ? 'Tap a second ' + noun + ' and add it to compare.'
+        : 'Click a second ' + noun + ' to compare.';
     } else if (!data || data.insufficientData){
-      compareHintEl.textContent = 'Not enough overlapping data for these two counties in the selected year span.';
+      compareHintEl.textContent = 'Not enough overlapping data for these two ' + nounPlural + ' in the selected year span.';
     } else if (data.isRaw){
       compareHintEl.textContent = 'Raw population change since ' + data.baseYear + ', linear scale.';
     } else {
@@ -1625,7 +1925,18 @@ function linearForward(v, s) {
     }
   }
 
+  function updateComparePanelChrome(){
+    var level = compareLevelNow();
+    var singular = level === 'state' ? 'state' : 'county';
+    var plural = level === 'state' ? 'states' : 'counties';
+    compareTitleEl.textContent = 'Compare Two ' + (level === 'state' ? 'States' : 'Counties');
+    comparePlaceholderEl.textContent = MOBILE_MODE
+      ? 'Tap a ' + singular + ' on the map above, then use "Toggle Compare" in its panel. Do that for a second ' + singular + ' to see the chart here.'
+      : 'Select two ' + plural + ' on the map above.';
+  }
+
   function updateCompareUI(){
+    updateComparePanelChrome();
     updateCompareSlots();
     var data = computeCompareSeries();
     renderCompareChart(data);
@@ -1639,26 +1950,29 @@ function linearForward(v, s) {
   // the new dimensions -- nothing else naturally triggers one.
   var compareResizeTimer = null;
   window.addEventListener('resize', function(){
-    if (!compareFipsA || !compareFipsB) return;
+    if (!getCompareA() || !getCompareB()) return;
     clearTimeout(compareResizeTimer);
     compareResizeTimer = setTimeout(function(){ renderCompareChart(computeCompareSeries()); }, 150);
   });
 
   if (MOBILE_MODE){
-    attachTap(countyPaths);
-    attachTap(ctNewPaths);
+    attachTap(countyPaths, 'county');
+    attachTap(ctNewPaths, 'county');
+    if (STATE_MODE_AVAILABLE) attachTap(statePaths, 'state');
     // Tapping anywhere outside the panel dismisses it -- not just inside
-    // the map, since the panel can end up covering the very county that
-    // opened it. County taps call stopPropagation() so they reach this
-    // listener only when they *don't* match the already-selected county.
+    // the map, since the panel can end up covering the very county/state
+    // that opened it. Taps call stopPropagation() so they reach this
+    // listener only when they *don't* match the already-selected feature.
     document.addEventListener('click', function(event){
       if (selectedFips && !mobilePanel.contains(event.target)) hideMobilePanel();
     });
   } else {
-    attachHover(countyPaths);
-    attachHover(ctNewPaths);
-    attachCompareClick(countyPaths);
-    attachCompareClick(ctNewPaths);
+    attachHover(countyPaths, infoHtmlCounty);
+    attachHover(ctNewPaths, infoHtmlCounty);
+    if (STATE_MODE_AVAILABLE) attachHover(statePaths, infoHtmlState);
+    attachCompareClick(countyPaths, 'county');
+    attachCompareClick(ctNewPaths, 'county');
+    if (STATE_MODE_AVAILABLE) attachCompareClick(statePaths, 'state');
   }
 
   // ---- scale toggle ----
@@ -1679,6 +1993,37 @@ function linearForward(v, s) {
       if (mode === metricMode) return;
       metricMode = mode;
       document.querySelectorAll('.metric-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      computeAndRender(currentStart, currentEnd);
+    });
+  });
+
+  // ---- level toggle (County Mode vs. State Mode) ----
+  var mapHintEl = document.getElementById('map-hint');
+  document.querySelectorAll('.level-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (btn.disabled) return;
+      var mode = btn.getAttribute('data-level');
+      if (mode === levelMode) return;
+      levelMode = mode;
+      document.querySelectorAll('.level-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+
+      // A county-level zoom/pan position rarely makes sense once the map
+      // switches to ~50 much larger state shapes (or vice versa), so reset
+      // to the fitted default view on every level switch rather than
+      // leaving the previous mode's framing in place.
+      svg.transition().duration(220).call(zoomBehavior.transform, d3.zoomIdentity);
+
+      // Whatever was selected (county or state) belongs to the layer that's
+      // about to be hidden, so close the mobile info panel rather than show
+      // stale content for a now-hidden feature.
+      if (MOBILE_MODE && selectedFips) hideMobilePanel();
+
+      if (MOBILE_MODE && mapHintEl){
+        mapHintEl.textContent = levelMode === 'state'
+          ? 'Two fingers to pan & zoom \u00b7 tap a state for details'
+          : 'Two fingers to pan & zoom \u00b7 tap a county for details';
+      }
+
       computeAndRender(currentStart, currentEnd);
     });
   });
