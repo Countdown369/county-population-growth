@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>US County Population Atlas</title>
+<title>US Population Growth Atlas</title>
 <style>
   :root{
     --bg: #0F1620;
@@ -402,31 +402,92 @@
   .compare-clear:hover{ color:var(--text); border-color:var(--text-dim); }
 
   .compare-slots{
-    display:flex; align-items:center; gap:14px;
+    display:flex; align-items:flex-start; gap:14px;
     margin-bottom:16px;
     flex-wrap:wrap;
   }
-  .compare-slot{
-    display:flex; align-items:center; gap:8px;
+  .compare-group{
+    display:flex; flex-direction:column; gap:9px;
     background:var(--bg);
     border:1px solid var(--panel-border);
-    border-radius:7px;
-    padding:8px 14px;
-    font-size:13.5px;
-    color:var(--text-dim);
-    min-width:180px;
+    border-radius:8px;
+    padding:10px 14px 12px;
+    min-width:220px;
     flex:1;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  .compare-slot.filled{ color:var(--text); cursor:pointer; }
-  .compare-slot.filled:hover{ border-color:var(--text-dim); }
-  .compare-slot .dot{
+  .compare-group.armed{ border-color:var(--text-dim); }
+  .compare-group[data-slot="a"].armed{ border-color:var(--compare-a); box-shadow:0 0 0 1px var(--compare-a) inset; }
+  .compare-group[data-slot="b"].armed{ border-color:var(--compare-b); box-shadow:0 0 0 1px var(--compare-b) inset; }
+  .compare-group-head{
+    display:flex; align-items:center; gap:8px;
+  }
+  .compare-group-head .dot{
     width:10px; height:10px; border-radius:50%; flex-shrink:0;
   }
-  .compare-slot .dot-a{ background:var(--compare-a); }
-  .compare-slot .dot-b{ background:var(--compare-b); }
-  .compare-slot .slot-name{
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  .compare-group-head .dot-a{ background:var(--compare-a); }
+  .compare-group-head .dot-b{ background:var(--compare-b); }
+  .compare-group-title{
+    font-size:13.5px; color:var(--text); font-weight:600;
+    flex:1;
   }
+  .compare-size-stepper{
+    display:inline-flex; align-items:center; gap:1px;
+    font-family:var(--font-data); font-size:12px; color:var(--text-dim);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .compare-size-stepper .size-btn{
+    background:none; border:none; color:var(--text-dim);
+    width:20px; height:20px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; line-height:1; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .compare-size-stepper .size-btn:hover:not(:disabled){ background:rgba(217,164,65,0.18); color:var(--text); }
+  .compare-size-stepper .size-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .compare-size-stepper .size-value{
+    min-width:16px; text-align:center; color:var(--text); padding:0 2px;
+  }
+  .compare-chip-list{
+    display:flex; flex-wrap:wrap; gap:6px;
+    min-height:26px;
+  }
+  .compare-chip{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:20px;
+    padding:4px 6px 4px 11px;
+    font-size:12.5px;
+    color:var(--text);
+    max-width:100%;
+  }
+  .compare-chip .chip-label{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;
+  }
+  .compare-chip .chip-remove{
+    display:flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border-radius:50%;
+    background:none; border:none;
+    color:var(--text-dim);
+    font-size:13px; line-height:1; cursor:pointer;
+    flex-shrink:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .compare-chip .chip-remove:hover{ color:var(--text); background:rgba(237,239,243,0.12); }
+  .compare-chip.add-chip{
+    background:none;
+    border:1px dashed var(--panel-border);
+    color:var(--text-dim);
+    cursor:pointer;
+    padding:4px 12px;
+  }
+  .compare-chip.add-chip:hover{ color:var(--text); border-color:var(--text-dim); }
+  .compare-chip.add-chip.armed{ color:var(--text); border-style:solid; }
+  .compare-chip.add-chip:disabled{ opacity:0.4; cursor:not-allowed; }
   .compare-vs{
     font-family:var(--font-data);
     font-size:11.5px;
@@ -518,7 +579,9 @@
     .hero-sub{ margin-left:0; }
     .map-wrap{ min-height:320px; }
     .compare-panel{ padding:16px 16px 18px; }
-    .compare-slot{ min-width:130px; padding:8px 10px; }
+    .compare-slots{ flex-direction:column; align-items:stretch; }
+    .compare-vs{ align-self:center; }
+    .compare-group{ min-width:0; padding:10px 12px 11px; }
     .compare-summary{ gap:14px; }
   }
   @media (prefers-reduced-motion: reduce){
@@ -596,7 +659,7 @@
 <div id="app" style="visibility:hidden">
 
   <header class="top">
-    <h1>US County Population Atlas</h1>
+    <h1>US Population Growth Atlas</h1>
     <p class="sub" id="subtitle">Drag the handles below to choose a year span. Toggle between percent and raw change. US Census Bureau county population estimates.</p>
   </header>
 
@@ -676,9 +739,31 @@
       <button type="button" class="compare-clear" id="compare-clear">Clear</button>
     </div>
     <div class="compare-slots">
-      <div class="compare-slot" id="compare-slot-a"><span class="dot dot-a"></span><span class="slot-name">Click a county&hellip;</span></div>
+      <div class="compare-group" id="compare-group-a" data-slot="a">
+        <div class="compare-group-head">
+          <span class="dot dot-a"></span>
+          <span class="compare-group-title" id="compare-group-title-a">Group A</span>
+          <div class="compare-size-stepper" data-slot="a" aria-label="Group A size">
+            <button type="button" class="size-btn" data-slot="a" data-action="dec" aria-label="Fewer in Group A">&minus;</button>
+            <span class="size-value" id="compare-size-a">1</span>
+            <button type="button" class="size-btn" data-slot="a" data-action="inc" aria-label="More in Group A">+</button>
+          </div>
+        </div>
+        <div class="compare-chip-list" id="compare-chips-a"></div>
+      </div>
       <span class="compare-vs">vs</span>
-      <div class="compare-slot" id="compare-slot-b"><span class="dot dot-b"></span><span class="slot-name">Click a county&hellip;</span></div>
+      <div class="compare-group" id="compare-group-b" data-slot="b">
+        <div class="compare-group-head">
+          <span class="dot dot-b"></span>
+          <span class="compare-group-title" id="compare-group-title-b">Group B</span>
+          <div class="compare-size-stepper" data-slot="b" aria-label="Group B size">
+            <button type="button" class="size-btn" data-slot="b" data-action="dec" aria-label="Fewer in Group B">&minus;</button>
+            <span class="size-value" id="compare-size-b">1</span>
+            <button type="button" class="size-btn" data-slot="b" data-action="inc" aria-label="More in Group B">+</button>
+          </div>
+        </div>
+        <div class="compare-chip-list" id="compare-chips-b"></div>
+      </div>
     </div>
     <div class="compare-chart-wrap empty" id="compare-chart-wrap">
       <svg id="compare-svg"></svg>
@@ -1609,7 +1694,7 @@ function linearForward(v, s) {
     });
   }
 
-  // ---- compare two counties / two states (desktop + mobile) ----
+  // ---- compare groups of counties / states (desktop + mobile) ----
   // Desktop has no other use for a plain click on a county or state (hover
   // already drives the tooltip), so clicking becomes "select for
   // comparison" there (attachCompareClick, below). Touch devices need tap
@@ -1618,27 +1703,56 @@ function linearForward(v, s) {
   // mobileCompareBtn) rather than the tap itself -- both paths funnel into
   // the same toggleCompareSelection().
   //
-  // County and state comparisons are tracked as two independent pairs
-  // (compareFipsA/B vs. compareStateA/B) rather than one shared pair, so
-  // switching between County Mode and State Mode doesn't clobber whatever
-  // you'd already picked in the other mode -- flip back and it's still there.
+  // Two arbitrary-size groups (not just two single picks) can be compared:
+  // Group A and Group B each hold 1..MAX_GROUP_SIZE counties/states, and the
+  // chart compares their *combined* populations. The default cap is 1 for
+  // both groups, which makes the default behavior identical to comparing a
+  // single county against another single county.
+  //
+  // County and state comparisons are tracked as two independent pairs of
+  // arrays (compareGroupCountyA/B vs. compareGroupStateA/B) rather than one
+  // shared pair, so switching between County Mode and State Mode doesn't
+  // clobber whatever you'd already picked in the other mode -- flip back
+  // and it's still there. The size caps (compareGroupCap) are shared across
+  // both levels, since "I want 3 vs 3" is a UI preference, not something
+  // tied to county vs. state picks.
   var comparePanel = document.getElementById('compare-panel');
-  var compareFipsA = null, compareFipsB = null;   // County Mode pair
-  var compareStateA = null, compareStateB = null; // State Mode pair
+  var MAX_GROUP_SIZE = 8;
+  var compareGroupCountyA = [], compareGroupCountyB = []; // County Mode groups
+  var compareGroupStateA = [], compareGroupStateB = [];   // State Mode groups
+  var compareGroupCap = { a: 1, b: 1 };
+  // Which group a fresh (unselected) pick joins next. null means "auto" --
+  // fill Group A first, then Group B, exactly like the old two-slot
+  // behavior when both caps are 1. An explicit tap on a group's "+ Add"
+  // chip (or on the group card itself) arms that group instead, so a run
+  // of map clicks can be steered into Group B before Group A is full.
+  var armedSlot = null; // 'a' | 'b' | null
   var compareSvg = d3.select('#compare-svg');
   var compareChartWrap = document.getElementById('compare-chart-wrap');
   var compareTitleEl = document.getElementById('compare-title');
   var compareHintEl = document.getElementById('compare-hint');
   var comparePlaceholderEl = document.getElementById('compare-placeholder');
   var compareSummaryEl = document.getElementById('compare-summary');
-  var compareSlotA = document.getElementById('compare-slot-a');
-  var compareSlotB = document.getElementById('compare-slot-b');
+  var compareGroupElA = document.getElementById('compare-group-a');
+  var compareGroupElB = document.getElementById('compare-group-b');
+  var compareChipsElA = document.getElementById('compare-chips-a');
+  var compareChipsElB = document.getElementById('compare-chips-b');
+  var compareGroupTitleA = document.getElementById('compare-group-title-a');
+  var compareGroupTitleB = document.getElementById('compare-group-title-b');
+  var compareSizeElA = document.getElementById('compare-size-a');
+  var compareSizeElB = document.getElementById('compare-size-b');
 
   function compareLevelNow(){ return levelMode === 'state' ? 'state' : 'county'; }
-  function getCompareA(){ return compareLevelNow() === 'state' ? compareStateA : compareFipsA; }
-  function getCompareB(){ return compareLevelNow() === 'state' ? compareStateB : compareFipsB; }
-  function setCompareA(v){ if (compareLevelNow() === 'state') compareStateA = v; else compareFipsA = v; }
-  function setCompareB(v){ if (compareLevelNow() === 'state') compareStateB = v; else compareFipsB = v; }
+
+  function compareGroupArr(slot, level){
+    level = level || compareLevelNow();
+    if (level === 'state') return slot === 'a' ? compareGroupStateA : compareGroupStateB;
+    return slot === 'a' ? compareGroupCountyA : compareGroupCountyB;
+  }
+  function setCompareGroupArr(slot, level, arr){
+    if (level === 'state'){ if (slot === 'a') compareGroupStateA = arr; else compareGroupStateB = arr; }
+    else { if (slot === 'a') compareGroupCountyA = arr; else compareGroupCountyB = arr; }
+  }
 
   function compareEntityName(id, level){
     if (level === 'state') return stateNamesByFips[id] || 'Unknown state';
@@ -1647,30 +1761,58 @@ function linearForward(v, s) {
   }
 
   function applyCompareHighlight(){
+    var a = compareGroupCountyA, b = compareGroupCountyB;
     countyPaths
-      .classed('compare-a', function(d){ return d.id === compareFipsA; })
-      .classed('compare-b', function(d){ return d.id === compareFipsB; });
+      .classed('compare-a', function(d){ return a.indexOf(d.id) !== -1; })
+      .classed('compare-b', function(d){ return b.indexOf(d.id) !== -1; });
     ctNewPaths
-      .classed('compare-a', function(d){ return d.id === compareFipsA; })
-      .classed('compare-b', function(d){ return d.id === compareFipsB; });
+      .classed('compare-a', function(d){ return a.indexOf(d.id) !== -1; })
+      .classed('compare-b', function(d){ return b.indexOf(d.id) !== -1; });
     if (STATE_MODE_AVAILABLE){
+      var sa = compareGroupStateA, sb = compareGroupStateB;
       statePaths
-        .classed('compare-a', function(d){ return stateFipsOf(d) === compareStateA; })
-        .classed('compare-b', function(d){ return stateFipsOf(d) === compareStateB; });
+        .classed('compare-a', function(d){ return sa.indexOf(stateFipsOf(d)) !== -1; })
+        .classed('compare-b', function(d){ return sb.indexOf(stateFipsOf(d)) !== -1; });
     }
+  }
+
+  // Decides which group a fresh pick should join: the explicitly-armed group
+  // if it still has room, otherwise whichever of A/B has room, preferring A
+  // -- so the default 1-vs-1 case fills exactly like the old two-slot
+  // version. Returns null if both groups are already at their configured cap.
+  function resolveTargetSlot(level){
+    level = level || compareLevelNow();
+    var a = compareGroupArr('a', level), b = compareGroupArr('b', level);
+    if (armedSlot === 'a' && a.length < compareGroupCap.a) return 'a';
+    if (armedSlot === 'b' && b.length < compareGroupCap.b) return 'b';
+    if (a.length < compareGroupCap.a) return 'a';
+    if (b.length < compareGroupCap.b) return 'b';
+    return null;
   }
 
   function toggleCompareSelection(id, level){
     level = level || compareLevelNow();
-    var a = level === 'state' ? compareStateA : compareFipsA;
-    var b = level === 'state' ? compareStateB : compareFipsB;
-    if (id === a){ a = null; }
-    else if (id === b){ b = null; }
-    else if (!a){ a = id; }
-    else if (!b){ b = id; }
-    else { a = b; b = id; } // rotate: newest pick bumps the older slot
-    if (level === 'state'){ compareStateA = a; compareStateB = b; }
-    else { compareFipsA = a; compareFipsB = b; }
+    var a = compareGroupArr('a', level), b = compareGroupArr('b', level);
+    var ia = a.indexOf(id), ib = b.indexOf(id);
+    if (ia !== -1){
+      a = a.slice(); a.splice(ia, 1);
+      setCompareGroupArr('a', level, a);
+    } else if (ib !== -1){
+      b = b.slice(); b.splice(ib, 1);
+      setCompareGroupArr('b', level, b);
+    } else {
+      var target = resolveTargetSlot(level);
+      if (!target) return; // both groups already full at their configured size
+      if (target === 'a'){ a = a.concat([id]); setCompareGroupArr('a', level, a); }
+      else { b = b.concat([id]); setCompareGroupArr('b', level, b); }
+      // Once the armed group fills up, hand off to whichever group still has
+      // room so a run of clicks keeps landing somewhere sensible without
+      // requiring another explicit "+ Add" tap in between.
+      if (armedSlot === target && (target === 'a' ? a : b).length >= compareGroupCap[target]){
+        var other = target === 'a' ? 'b' : 'a';
+        armedSlot = (compareGroupArr(other, level).length < compareGroupCap[other]) ? other : null;
+      }
+    }
     applyCompareHighlight();
     updateCompareUI();
   }
@@ -1683,61 +1825,175 @@ function linearForward(v, s) {
   }
 
   function clearCompareSelection(){
-    setCompareA(null); setCompareB(null);
+    compareGroupCountyA = []; compareGroupCountyB = [];
+    compareGroupStateA = []; compareGroupStateB = [];
+    armedSlot = null;
     applyCompareHighlight();
     updateCompareUI();
   }
 
   document.getElementById('compare-clear').addEventListener('click', clearCompareSelection);
-  compareSlotA.addEventListener('click', function(){ if (getCompareA()){ setCompareA(null); applyCompareHighlight(); updateCompareUI(); } });
-  compareSlotB.addEventListener('click', function(){ if (getCompareB()){ setCompareB(null); applyCompareHighlight(); updateCompareUI(); } });
 
-  function updateCompareSlots(){
+  // Arms/disarms a group as the destination for the next map pick. Clicking
+  // an already-armed group's chip (or card) again disarms it back to auto.
+  function armSlot(slot){
     var level = compareLevelNow();
-    var idA = getCompareA(), idB = getCompareB();
-    var placeholder = (MOBILE_MODE ? 'Tap a ' : 'Click a ') + level + '\u2026';
-    compareSlotA.querySelector('.slot-name').textContent = idA ? compareEntityName(idA, level) : placeholder;
-    compareSlotA.classList.toggle('filled', !!idA);
-    compareSlotB.querySelector('.slot-name').textContent = idB ? compareEntityName(idB, level) : placeholder;
-    compareSlotB.classList.toggle('filled', !!idB);
+    if (compareGroupArr(slot, level).length >= compareGroupCap[slot]) return;
+    armedSlot = (armedSlot === slot) ? null : slot;
+    updateCompareSlots();
   }
 
+  [['a', compareGroupElA], ['b', compareGroupElB]].forEach(function(pair){
+    var slot = pair[0], el = pair[1];
+    el.addEventListener('click', function(event){
+      if (event.target.closest('.compare-size-stepper') || event.target.closest('.chip-remove')) return;
+      // The add-chip's own handler already arms the slot and stops
+      // propagation, so this only fires for clicks elsewhere on the card.
+      armSlot(slot);
+    });
+  });
+
+  // Size steppers: +/- adjust each group's cap (1..MAX_GROUP_SIZE), shared
+  // across County Mode and State Mode. Shrinking a cap below the current
+  // member count trims the most-recently-added members off the end of
+  // *both* levels' arrays, so the earliest picks -- the ones a comparison is
+  // most likely still being built around -- stay put.
+  document.querySelectorAll('.size-btn').forEach(function(btn){
+    btn.addEventListener('click', function(event){
+      event.stopPropagation();
+      var slot = btn.getAttribute('data-slot');
+      var next = compareGroupCap[slot] + (btn.getAttribute('data-action') === 'inc' ? 1 : -1);
+      next = Math.max(1, Math.min(MAX_GROUP_SIZE, next));
+      if (next === compareGroupCap[slot]) return;
+      compareGroupCap[slot] = next;
+      ['county', 'state'].forEach(function(lvl){
+        var arr = compareGroupArr(slot, lvl);
+        if (arr.length > next) setCompareGroupArr(slot, lvl, arr.slice(0, next));
+      });
+      if (armedSlot === slot && compareGroupArr(slot).length >= next) armedSlot = null;
+      applyCompareHighlight();
+      updateCompareUI();
+    });
+  });
+
+  function removeFromGroup(slot, id){
+    var level = compareLevelNow();
+    var arr = compareGroupArr(slot, level).slice();
+    var idx = arr.indexOf(id);
+    if (idx === -1) return;
+    arr.splice(idx, 1);
+    setCompareGroupArr(slot, level, arr);
+    applyCompareHighlight();
+    updateCompareUI();
+  }
+
+  function renderCompareChips(slot, listEl, titleEl, sizeEl){
+    var level = compareLevelNow();
+    var arr = compareGroupArr(slot, level);
+    var cap = compareGroupCap[slot];
+    titleEl.textContent = 'Group ' + slot.toUpperCase();
+    if (sizeEl) sizeEl.textContent = cap;
+    listEl.innerHTML = '';
+    arr.forEach(function(id){
+      var name = compareEntityName(id, level);
+      var chip = document.createElement('span');
+      chip.className = 'compare-chip';
+      var label = document.createElement('span');
+      label.className = 'chip-label';
+      label.textContent = name;
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'chip-remove';
+      remove.setAttribute('aria-label', 'Remove ' + name);
+      remove.textContent = '\u00d7';
+      remove.addEventListener('click', function(event){
+        event.stopPropagation();
+        removeFromGroup(slot, id);
+      });
+      chip.appendChild(label);
+      chip.appendChild(remove);
+      listEl.appendChild(chip);
+    });
+    if (arr.length < cap){
+      var noun = level === 'state' ? 'state' : 'county';
+      var addChip = document.createElement('button');
+      addChip.type = 'button';
+      addChip.className = 'compare-chip add-chip' + (armedSlot === slot ? ' armed' : '');
+      addChip.textContent = arr.length === 0
+        ? '+ ' + (MOBILE_MODE ? 'Tap' : 'Click') + ' a ' + noun
+        : (armedSlot === slot ? 'Picking\u2026' : '+ Add another');
+      addChip.addEventListener('click', function(event){
+        event.stopPropagation();
+        armSlot(slot);
+      });
+      listEl.appendChild(addChip);
+    }
+    compareGroupElA.classList.toggle('armed', armedSlot === 'a');
+    compareGroupElB.classList.toggle('armed', armedSlot === 'b');
+  }
+
+  // Keeps each size stepper's +/- buttons from offering to go past the
+  // 1..MAX_GROUP_SIZE bounds the click handler already enforces, so the
+  // buttons visibly gray out at the limits instead of just silently no-op'ing.
+  function updateSizeStepperButtons(){
+    document.querySelectorAll('.size-btn').forEach(function(btn){
+      var slot = btn.getAttribute('data-slot');
+      var cap = compareGroupCap[slot];
+      btn.disabled = btn.getAttribute('data-action') === 'dec' ? cap <= 1 : cap >= MAX_GROUP_SIZE;
+    });
+  }
+
+  function updateCompareSlots(){
+    renderCompareChips('a', compareChipsElA, compareGroupTitleA, compareSizeElA);
+    renderCompareChips('b', compareChipsElB, compareGroupTitleB, compareSizeElB);
+    updateSizeStepperButtons();
+  }
+
+
   // ---- mobile "Toggle Compare" button (lives inside the tap-to-open info
-  // panel, since a plain tap on the map is already spoken for by that
-  // panel on touch devices -- see attachTap below). Selecting/deselecting
-  // goes through the same toggleCompareSelection() as the desktop's
-  // click-on-map path, so both flows stay in sync automatically.
+  // panel, since a plain tap on the map is already spoken for by that panel
+  // on touch devices -- see attachTap below). It targets whichever group
+  // resolveTargetSlot() would pick next; arm a specific group first via its
+  // "+ Add" chip in the panel below to steer where the next tap lands.
+  // Selecting/deselecting goes through the same toggleCompareSelection() as
+  // the desktop's click-on-map path, so both flows stay in sync automatically.
   var mobileCompareBtn = document.getElementById('mobile-panel-compare');
   var mobileCompareDot = document.getElementById('mobile-panel-compare-dot');
   var mobileCompareLabel = document.getElementById('mobile-panel-compare-label');
 
   function updateMobileCompareButton(){
     if (!selectedFips) return;
-    var isA, isB;
-    if (selectedLevel === 'state'){
-      isA = selectedFips === compareStateA; isB = selectedFips === compareStateB;
-    } else {
-      isA = selectedFips === compareFipsA; isB = selectedFips === compareFipsB;
-    }
+    var level = selectedLevel;
+    var a = compareGroupArr('a', level), b = compareGroupArr('b', level);
+    var isA = a.indexOf(selectedFips) !== -1;
+    var isB = b.indexOf(selectedFips) !== -1;
     mobileCompareDot.className = 'dot' + (isA ? ' dot-a' : isB ? ' dot-b' : '');
     mobileCompareBtn.classList.toggle('active', isA || isB);
-    mobileCompareLabel.textContent = 'Toggle Compare';
+    if (isA){ mobileCompareLabel.textContent = 'Remove from Group A'; mobileCompareBtn.disabled = false; }
+    else if (isB){ mobileCompareLabel.textContent = 'Remove from Group B'; mobileCompareBtn.disabled = false; }
+    else {
+      var target = resolveTargetSlot(level);
+      mobileCompareBtn.disabled = !target;
+      mobileCompareLabel.textContent = target ? ('Add to Group ' + target.toUpperCase()) : 'Both groups full';
+    }
   }
 
   mobileCompareBtn.addEventListener('click', function(event){
     // Without this, the click bubbles to the "tap anywhere on the panel
     // dismisses it" listener below and closes the panel right away instead
-    // of giving feedback (the button flipping to "Remove from Compare").
+    // of giving feedback (the button flipping to "Remove from Group A/B").
     event.stopPropagation();
     if (!selectedFips) return;
     var level = selectedLevel;
     toggleCompareSelection(selectedFips, level);
-    // Once a second county/state is added, the interesting result is the
-    // chart down in the comparison panel, not this feature's own info -- so
-    // close the sheet and bring the chart into view rather than leaving
-    // people to notice and scroll to it themselves.
-    var bothFilled = level === 'state' ? (compareStateA && compareStateB) : (compareFipsA && compareFipsB);
-    if (bothFilled){
+    // Once both groups are fully built out to their configured size, the
+    // interesting result is the chart down in the comparison panel, not
+    // this feature's own info -- so close the sheet and bring the chart
+    // into view rather than leaving people to notice and scroll to it
+    // themselves. Groups still short of their cap stay open on the map so
+    // the next tap can add another member.
+    var a = compareGroupArr('a', level), b = compareGroupArr('b', level);
+    if (a.length >= compareGroupCap.a && b.length >= compareGroupCap.b && a.length > 0 && b.length > 0){
       hideMobilePanel();
       comparePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -1749,31 +2005,70 @@ function linearForward(v, s) {
   // = 100, always positive so a log y-axis works), or population-minus-
   // baseline in raw mode (baseline = 0, but raw change can go negative on a
   // decline, so log is impossible there and we fall back to a linear axis).
+  function getRecordForId(id, level){
+    return level === 'state' ? getStatePseudoRecord(id) : countiesById[id];
+  }
+
+  // Sums a group's members into a single population series across all
+  // YEARS. A year is null for the whole group -- not just zero -- if any
+  // one member is missing data for it, the same "can't compute this span"
+  // treatment a single county/state already got.
+  function groupPopulationSeries(ids, level){
+    var series = new Array(NUM_YEARS).fill(0);
+    var known = new Array(NUM_YEARS).fill(true);
+    for (var k = 0; k < ids.length; k++){
+      var rec = getRecordForId(ids[k], level);
+      for (var yi = 0; yi < NUM_YEARS; yi++){
+        if (!known[yi]) continue;
+        var p = rec ? rec.p[yi] : null;
+        if (p == null){ known[yi] = false; continue; }
+        series[yi] += p;
+      }
+    }
+    return series.map(function(v, yi){ return known[yi] ? v : null; });
+  }
+
+  // Short label for a group: the single member's own name when there's
+  // just one (so the default 1-vs-1 case reads exactly like before), or a
+  // count otherwise -- the chip list in the panel above already spells out
+  // which counties/states are in the group.
+  function groupLabel(ids, level){
+    if (ids.length === 1) return compareEntityName(ids[0], level);
+    var nounPlural = level === 'state' ? 'states' : 'counties';
+    return ids.length + ' ' + nounPlural;
+  }
+
+  // Builds both series over whatever slice of the currently selected year
+  // span both groups actually have combined data for, indexed so they
+  // "start at the same point": population/baseline*100 in % mode (baseline
+  // = 100, always positive so a log y-axis works), or population-minus-
+  // baseline in raw mode (baseline = 0, but raw change can go negative on a
+  // decline, so log is impossible there and we fall back to a linear axis).
   function computeCompareSeries(){
     var level = compareLevelNow();
-    var idA = getCompareA(), idB = getCompareB();
-    if (!idA || !idB) return null;
-    var recA = level === 'state' ? getStatePseudoRecord(idA) : countiesById[idA];
-    var recB = level === 'state' ? getStatePseudoRecord(idB) : countiesById[idB];
-    if (!recA || !recB) return { insufficientData: true };
+    var idsA = compareGroupArr('a', level), idsB = compareGroupArr('b', level);
+    if (!idsA.length || !idsB.length) return null;
+    var seriesA = groupPopulationSeries(idsA, level);
+    var seriesB = groupPopulationSeries(idsB, level);
     var si = YEARS.indexOf(currentStart), ei = YEARS.indexOf(currentEnd);
     if (si === -1) si = 0;
     if (ei === -1) ei = NUM_YEARS - 1;
     var idxs = [];
     for (var i = si; i <= ei; i++){
-      if (recA.p[i] != null && recB.p[i] != null) idxs.push(i);
+      if (seriesA[i] != null && seriesB[i] != null) idxs.push(i);
     }
     if (idxs.length < 2) return { insufficientData: true };
     var baseIdx = idxs[0];
-    var baseA = recA.p[baseIdx], baseB = recB.p[baseIdx];
+    var baseA = seriesA[baseIdx], baseB = seriesB[baseIdx];
     var isRaw = metricMode === 'raw';
     var years = idxs.map(function(i){ return YEARS[i]; });
-    var seriesA = idxs.map(function(i){ return isRaw ? (recA.p[i] - baseA) : (recA.p[i] / baseA * 100); });
-    var seriesB = idxs.map(function(i){ return isRaw ? (recB.p[i] - baseB) : (recB.p[i] / baseB * 100); });
+    var valsA = idxs.map(function(i){ return isRaw ? (seriesA[i] - baseA) : (seriesA[i] / baseA * 100); });
+    var valsB = idxs.map(function(i){ return isRaw ? (seriesB[i] - baseB) : (seriesB[i] / baseB * 100); });
     return {
       insufficientData: false,
-      years: years, a: seriesA, b: seriesB,
-      nameA: recA.n, nameB: recB.n,
+      years: years, a: valsA, b: valsB,
+      nameA: groupLabel(idsA, level), nameB: groupLabel(idsB, level),
+      countA: idsA.length, countB: idsB.length,
       baseYear: YEARS[baseIdx], isRaw: isRaw
     };
   }
@@ -1877,8 +2172,10 @@ function linearForward(v, s) {
       // On a wide chart there's room to hang the label off the right end of
       // the line. A narrow (phone-width) chart has little to no margin
       // there, so anchor the label back over the plot area instead --
-      // otherwise a longer county name runs off the edge of the viewBox
-      // and gets clipped.
+      // otherwise a longer county name (or group label) runs off the edge
+      // of the viewBox and gets clipped. Single-county names are trimmed to
+      // just the county part (before the state); group labels ("3
+      // counties") have no comma to trim and pass through unchanged.
       var label = g.append('text')
         .attr('class', 'compare-end-label')
         .attr('y', lastY)
@@ -1898,31 +2195,42 @@ function linearForward(v, s) {
     var changeA = data.isRaw ? lastA : (lastA - 100);
     var changeB = data.isRaw ? lastB : (lastB - 100);
     var fmt = data.isRaw ? fmtRaw : fmtPct;
+    var labelA = data.nameA + (data.countA > 1 ? ' combined' : '');
+    var labelB = data.nameB + (data.countB > 1 ? ' combined' : '');
     compareSummaryEl.innerHTML =
-      '<span class="compare-summary-item" style="color:var(--compare-a)">' + data.nameA + ': ' + fmt(changeA) + '</span>' +
-      '<span class="compare-summary-item" style="color:var(--compare-b)">' + data.nameB + ': ' + fmt(changeB) + '</span>' +
+      '<span class="compare-summary-item" style="color:var(--compare-a)">' + labelA + ': ' + fmt(changeA) + '</span>' +
+      '<span class="compare-summary-item" style="color:var(--compare-b)">' + labelB + ': ' + fmt(changeB) + '</span>' +
       '<span class="compare-summary-note">since ' + data.baseYear + '</span>';
   }
 
   function updateCompareHint(data){
     var level = compareLevelNow();
-    var idA = getCompareA(), idB = getCompareB();
+    var idsA = compareGroupArr('a', level), idsB = compareGroupArr('b', level);
     var noun = level === 'state' ? 'state' : 'county';
     var nounPlural = level === 'state' ? 'states' : 'counties';
-    if (!idA && !idB){
+    var capA = compareGroupCap.a, capB = compareGroupCap.b;
+    if (!idsA.length && !idsB.length){
       compareHintEl.textContent = MOBILE_MODE
-        ? 'Tap a ' + noun + ', then use "Toggle Compare" in its panel. Do that for two ' + nounPlural + ' to compare their growth trajectories.'
-        : 'Click two ' + nounPlural + ' on the map to compare their growth trajectories.';
-    } else if (!idB){
-      compareHintEl.textContent = MOBILE_MODE
-        ? 'Tap a second ' + noun + ' and add it to compare.'
-        : 'Click a second ' + noun + ' to compare.';
+        ? 'Tap a ' + noun + ', then use "Toggle Compare" in its panel. Do that for a ' + noun + ' in each group to compare their growth trajectories -- use the +/- next to each group to compare more than one at a time.'
+        : 'Click a ' + noun + ' on the map for Group A, then another for Group B, to compare their growth trajectories. Use the +/- next to each group to compare several at once.';
+    } else if (!idsA.length || !idsB.length){
+      // Which group a click fills next isn't simply "whichever is empty" --
+      // a group with room left under its own cap (e.g. Group A holds 1 of a
+      // 2-person cap) still takes priority over a completely empty one that
+      // hasn't been armed, so defer to the same resolveTargetSlot() the
+      // click handler itself uses rather than re-deriving the answer here.
+      var target = resolveTargetSlot(level);
+      compareHintEl.textContent = (MOBILE_MODE ? 'Tap a ' : 'Click a ') + noun + ' to fill Group ' + (target ? target.toUpperCase() : 'A') + '.';
     } else if (!data || data.insufficientData){
-      compareHintEl.textContent = 'Not enough overlapping data for these two ' + nounPlural + ' in the selected year span.';
-    } else if (data.isRaw){
-      compareHintEl.textContent = 'Raw population change since ' + data.baseYear + ', linear scale.';
+      compareHintEl.textContent = 'Not enough overlapping data for these ' + nounPlural + ' in the selected year span.';
     } else {
-      compareHintEl.textContent = 'Population indexed to 100 at ' + data.baseYear + ', log scale.';
+      var scaleNote = data.isRaw
+        ? 'Raw population change since ' + data.baseYear + ', linear scale.'
+        : 'Population indexed to 100 at ' + data.baseYear + ', log scale.';
+      var sizeNote = (data.countA > 1 || data.countB > 1)
+        ? ' Group A: ' + data.countA + '/' + capA + ' ' + nounPlural + ' \u00b7 Group B: ' + data.countB + '/' + capB + ' ' + nounPlural + '.'
+        : '';
+      compareHintEl.textContent = scaleNote + sizeNote;
     }
   }
 
@@ -1930,10 +2238,13 @@ function linearForward(v, s) {
     var level = compareLevelNow();
     var singular = level === 'state' ? 'state' : 'county';
     var plural = level === 'state' ? 'states' : 'counties';
-    compareTitleEl.textContent = 'Compare Two ' + (level === 'state' ? 'States' : 'Counties');
+    var capA = compareGroupCap.a, capB = compareGroupCap.b;
+    compareTitleEl.textContent = (capA === 1 && capB === 1)
+      ? 'Compare Two ' + (level === 'state' ? 'States' : 'Counties')
+      : 'Compare Groups of ' + (level === 'state' ? 'States' : 'Counties');
     comparePlaceholderEl.textContent = MOBILE_MODE
-      ? 'Tap a ' + singular + ' on the map above, then use "Toggle Compare" in its panel. Do that for a second ' + singular + ' to see the chart here.'
-      : 'Select two ' + plural + ' on the map above.';
+      ? 'Tap a ' + singular + ' on the map above, then use "Toggle Compare" in its panel. Do that for a ' + singular + ' in each group to see the chart here.'
+      : 'Select a ' + singular + ' for Group A and a ' + singular + ' for Group B on the map above.';
   }
 
   function updateCompareUI(){
@@ -1951,7 +2262,7 @@ function linearForward(v, s) {
   // the new dimensions -- nothing else naturally triggers one.
   var compareResizeTimer = null;
   window.addEventListener('resize', function(){
-    if (!getCompareA() || !getCompareB()) return;
+    if (!compareGroupArr('a').length || !compareGroupArr('b').length) return;
     clearTimeout(compareResizeTimer);
     compareResizeTimer = setTimeout(function(){ renderCompareChart(computeCompareSeries()); }, 150);
   });
