@@ -787,6 +787,8 @@
     <br><br>
     State Mode totals each state's population from its own counties at the start and end year, then computes that state's percent/raw change from those totals. The color scale and legend rescale to the state-level range whenever State Mode is active.
     <br><br>
+    Because logarithmic functions do not accept negative inputs, using the Compare feature with raw change data will always show a Linear scale, even if Asymlog is selected. (Although percent change data can be negative, the chart is indexed at 100% in the start year, which can decrease. Raw change data is indexed to 0 in the start year, which cannot decrease as a logarithm.)
+    <br><br>
     Connecticut's eight historical counties were replaced by nine planning regions in 2022, so at the county level, spans that start at-or-before 2019 and end at-or-after 2020 can't compute figures for Connecticut and show as no-data (State Mode isn't affected by this).
     <br>
     Alaska's Chugach and Copper River Census Areas are mapped using their former combined Valdez&ndash;Cordova boundary, which the Census Bureau split in 2019. Due to other changes in Alaska's Census Area boundaries, only partial data for the state is available before 2000.
