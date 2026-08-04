@@ -65,6 +65,7 @@
   }
   .hero-stat{
     display:flex; flex-direction:column; gap:2px;
+    flex-shrink:0;
   }
   .hero-stat .value{
     font-family:var(--font-display);
@@ -72,6 +73,15 @@
     font-weight:600;
     line-height:1;
     font-variant-numeric: tabular-nums;
+    white-space:nowrap;
+    /* Reserves room for the longest values this stat can show ("Raw Change"
+       numbers like "-1,234,567" run much longer than a percent like
+       "+45.2%"). Without this, hero-row's width contribution from this
+       element changes with every update, which can push it past the wrap
+       threshold and bump .hero-row onto two lines, changing its height and
+       shifting the controls panel below. Fixing the width keeps that
+       threshold constant regardless of which value is being displayed. */
+    min-width:11ch;
   }
   .hero-stat .value.up{ color:var(--growth); }
   .hero-stat .value.down{ color:var(--decline); }
@@ -2106,15 +2116,27 @@ function linearForward(v, s) {
     var allVals = data.a.concat(data.b);
     var y, baseline;
     if (data.isRaw){
+      // Raw head-count change can go negative on a decline, and log scales
+      // are undefined for negative values, so Raw Change always renders
+      // linear regardless of the page-wide Asymlog/Linear toggle.
       var maxAbs = Math.max(d3.max(allVals, Math.abs), 1);
       y = d3.scaleLinear().domain([-maxAbs * 1.1, maxAbs * 1.1]).range([innerH, 0]).nice();
       baseline = 0;
     } else {
+      // % Change is always positive (indexed to a baseline of 100), so
+      // unlike Raw Change it CAN honor the page's Asymlog/Linear toggle --
+      // and should, so switching to "Linear" up top affects every chart on
+      // the page, this one included, rather than leaving it stuck on log.
+      baseline = 100;
       var minV = d3.min(allVals), maxV = d3.max(allVals);
       if (minV === maxV){ minV *= 0.97; maxV *= 1.03; }
-      var pad = Math.pow(maxV / minV, 0.1);
-      y = d3.scaleLog().domain([minV / pad, maxV * pad]).range([innerH, 0]);
-      baseline = 100;
+      if (scaleMode === 'linear'){
+        var linPad = Math.max((maxV - minV) * 0.12, 1);
+        y = d3.scaleLinear().domain([minV - linPad, maxV + linPad]).range([innerH, 0]).nice();
+      } else {
+        var pad = Math.pow(maxV / minV, 0.1);
+        y = d3.scaleLog().domain([minV / pad, maxV * pad]).range([innerH, 0]);
+      }
     }
 
     var yAxis = d3.axisLeft(y).ticks(5).tickFormat(function(v){ return data.isRaw ? fmtRaw(v) : Math.round(v); });
@@ -2226,7 +2248,7 @@ function linearForward(v, s) {
     } else {
       var scaleNote = data.isRaw
         ? 'Raw population change since ' + data.baseYear + ', linear scale.'
-        : 'Population indexed to 100 at ' + data.baseYear + ', log scale.';
+        : 'Population indexed to 100 at ' + data.baseYear + ', ' + (scaleMode === 'linear' ? 'linear' : 'log') + ' scale.';
       var sizeNote = (data.countA > 1 || data.countB > 1)
         ? ' Group A: ' + data.countA + '/' + capA + ' ' + nounPlural + ' \u00b7 Group B: ' + data.countB + '/' + capB + ' ' + nounPlural + '.'
         : '';
