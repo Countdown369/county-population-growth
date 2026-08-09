@@ -22,6 +22,18 @@
     --font-body: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --font-data: ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",monospace;
   }
+  /* Colorblind-friendly palette: swaps the red/green decline-growth pairing
+     (hard to distinguish under deuteranopia/protanopia) for a blue/orange
+     pairing, which stays distinguishable across all common forms of color
+     vision deficiency. Overriding these custom properties re-colors every
+     UI element that already keys off them (hero stat, slider, tooltips)
+     with no per-rule changes needed. The choropleth map's own ramp is a
+     separate JS-driven gradient, switched in colorFromT. */
+  body.colorblind-mode{
+    --decline: #4393C3;
+    --neutral: #8FA1B3;
+    --growth: #E08214;
+  }
   *{ box-sizing:border-box; }
   html,body{
     margin:0; padding:0; height:100%;
@@ -368,6 +380,20 @@
     font-size:11.5px;
     color:var(--text-dim);
     margin-top:2px;
+  }
+
+  .cb-toggle{
+    display:flex; align-items:center; gap:7px;
+    font-size:12.5px; color:var(--text-dim);
+    white-space:nowrap;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .cb-toggle input{
+    width:15px; height:15px;
+    accent-color:var(--accent);
+    cursor:pointer;
+    flex-shrink:0;
   }
 
   /* ---- county comparison panel (desktop + mobile) ---- */
@@ -726,6 +752,10 @@
         <button type="button" class="scale-btn active" data-scale="symlog">Asymlog</button>
         <button type="button" class="scale-btn" data-scale="linear">Linear</button>
       </div>
+      <label class="cb-toggle" for="colorblind-toggle">
+        <input type="checkbox" id="colorblind-toggle">
+        <span>Colorblind-friendly colors</span>
+      </label>
       <div class="legend-nodata"><span class="swatch"></span>No data for this span</div>
     </div>
   </div>
@@ -1182,11 +1212,24 @@
   var COLOR_STOPS_C = ['#d73027','#fc8d59','#fee08b','#ffffbf','#d9ef8b','#91cf60','#1a9850']
   //var COLOR_STOPS_C = ['#5C1A3D', COLOR_DECLINE, '#9C6B57', COLOR_NEUTRAL, '#d9c241', '#5B9A82', COLOR_GROWTH];
 
-  var colorFromT = d3.scaleLinear()
-    .domain(COLOR_STOPS_T)
-    .range(COLOR_STOPS_C)
-    .interpolate(d3.interpolateHcl)
-    .clamp(true);
+  // Colorblind-friendly alternative: same seven stop positions (COLOR_STOPS_T
+  // is untouched), but red/green swapped for a blue/orange diverging ramp
+  // (dark blue -> white/gray -> dark orange) so severity still reads as a
+  // hue shift, not just a saturation change, without relying on red vs.
+  // green discrimination.
+  var COLOR_STOPS_C_CB = ['#08306B','#4393C3','#92C5DE','#F7F7F7','#FDB863','#E08214','#B35806'];
+
+  var colorblindMode = false;
+
+  var colorFromT; // built by buildColorScale(), called once below and again on toggle
+  function buildColorScale(){
+    colorFromT = d3.scaleLinear()
+      .domain(COLOR_STOPS_T)
+      .range(colorblindMode ? COLOR_STOPS_C_CB : COLOR_STOPS_C)
+      .interpolate(d3.interpolateHcl)
+      .clamp(true);
+  }
+  buildColorScale();
 
   var SYMLOG_K_PCT = 3; // percentage-point width of the near-linear region around 0, in % mode
 
@@ -2321,6 +2364,17 @@ function linearForward(v, s) {
       computeAndRender(currentStart, currentEnd);
     });
   });
+
+  // ---- colorblind-friendly palette toggle ----
+  var colorblindToggleEl = document.getElementById('colorblind-toggle');
+  if (colorblindToggleEl){
+    colorblindToggleEl.addEventListener('change', function(){
+      colorblindMode = colorblindToggleEl.checked;
+      document.body.classList.toggle('colorblind-mode', colorblindMode);
+      buildColorScale();
+      computeAndRender(currentStart, currentEnd);
+    });
+  }
 
   // ---- metric toggle (percent change vs. raw head-count difference) ----
   document.querySelectorAll('.metric-btn').forEach(function(btn){
