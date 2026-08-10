@@ -396,6 +396,28 @@
     flex-shrink:0;
   }
 
+  .lock-toggle{
+    display:inline-flex; align-items:center; gap:0px;
+    border:1px solid var(--panel-border);
+    border-radius:7px;
+    background:none;
+    color:var(--text-dim);
+    font-family:var(--font-data);
+    font-size:12px;
+    padding:6px 12px;
+    cursor:pointer;
+    flex-shrink:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .lock-toggle:hover{ border-color:var(--text-dim); }
+  .lock-toggle .lock-icon{ font-size:12.5px; line-height:1; }
+  .lock-toggle.locked{
+    background:var(--accent);
+    color:#1A1305;
+    font-weight:600;
+    border-color:var(--accent);
+  }
+
   /* ---- county comparison panel (desktop + mobile) ---- */
   .compare-panel{
     background:var(--panel);
@@ -752,11 +774,16 @@
         <button type="button" class="scale-btn active" data-scale="symlog">Asymlog</button>
         <button type="button" class="scale-btn" data-scale="linear">Linear</button>
       </div>
+      <button type="button" class="lock-toggle" id="lock-scale-btn" aria-pressed="false" title="Freeze the color scale so the same growth rate always maps to the same color as you change the year span.">
+        <span class="lock-icon" aria-hidden="true"></span>
+        <span id="lock-scale-label">Lock Scale</span>
+      </button>
       <label class="cb-toggle" for="colorblind-toggle">
         <input type="checkbox" id="colorblind-toggle">
-        <span>Colorblind-friendly colors</span>
+        <span>Colorblind-friendly mode</span>
       </label>
       <div class="legend-nodata"><span class="swatch"></span>No data for this span</div>
+      <span class="scale-note" id="lock-scale-note"></span>
     </div>
   </div>
 
@@ -1287,6 +1314,23 @@ function linearForward(v, s) {
   function scaleForward(v, s){ return scaleMode === 'linear' ? linearForward(v, s) : symlogForward(v, s); }
   function scaleInverse(t, s){ return scaleMode === 'linear' ? linearInverse(t, s) : symlogInverse(t, s); }
 
+  // ---- scale lock ----
+  // colorForValue/renderLegend only ever read maxPos, maxNeg and k off a
+  // stats object -- they don't care whether it was just computed or handed
+  // to them from an earlier render -- so "locking" the scale just means
+  // freezing those three numbers and feeding the same frozen object back in
+  // on every subsequent render instead of recomputing from the new span's
+  // values. No persistence beyond that snapshot is needed: unlocking drops
+  // it, and locking again re-snapshots whatever's current at that moment.
+  var scaleLocked = false;
+  var lockedStats = null;      // { maxPos, maxNeg, k } captured at lock time
+  var lastLiveStats = null;    // most recent freshly-computed stats, kept around so the lock button always has something current to snapshot
+
+  function unlockScale(){
+    scaleLocked = false;
+    lockedStats = null;
+  }
+
   var metricMode = 'pct'; // 'pct' | 'raw' -- percent change vs. raw head-count difference
 
   // computeScaleStats is called with whichever metric's values are
@@ -1431,7 +1475,13 @@ function linearForward(v, s) {
     var valid = showCounties ? validCounty : validState;
     var noDataCount = showCounties ? noDataCountyCount : noDataStateCount;
 
-    var stats = computeScaleStats(valid, metricMode);
+    // Always compute the "live" stats for this span/metric/level so the lock
+    // button has something current to snapshot the moment it's pressed --
+    // but when the scale is locked, the map/legend themselves render off
+    // the frozen snapshot instead, so a given value keeps mapping to the
+    // same color no matter how the live range shifts underneath it.
+    lastLiveStats = computeScaleStats(valid, metricMode);
+    var stats = (scaleLocked && lockedStats) ? lockedStats : lastLiveStats;
 
     var countyFillFn = function(d){
       var rec = pctByFips.get(d.id);
@@ -2365,6 +2415,51 @@ function linearForward(v, s) {
     });
   });
 
+  // ---- scale lock toggle ----
+  // Locking freezes maxPos/maxNeg/k, so it stays meaningful across a scale
+  // mode switch (linear vs. asymlog just changes how a value maps to a
+  // position within that same frozen domain) and across a colorblind palette
+  // switch (that only re-colors the ramp, it doesn't touch the domain).
+  // Metric mode (percent vs. raw head-count) and geography level (county vs.
+  // state) are different: they change what the numbers themselves *mean* --
+  // a raw count and a percent aren't comparable, and county-level extremes
+  // dwarf state-level ones -- so a lock captured under one would silently
+  // mis-map values under the other. Those two switches release the lock
+  // rather than carry a now-meaningless snapshot forward.
+  var lockScaleBtn = document.getElementById('lock-scale-btn');
+  var lockScaleLabelEl = document.getElementById('lock-scale-label');
+  var lockScaleNoteEl = document.getElementById('lock-scale-note');
+
+  function updateLockToggleUI(){
+    lockScaleBtn.classList.toggle('locked', scaleLocked);
+    lockScaleBtn.setAttribute('aria-pressed', scaleLocked ? 'true' : 'false');
+    lockScaleBtn.querySelector('.lock-icon').innerHTML = scaleLocked ? '' : '';
+    lockScaleLabelEl.textContent = scaleLocked ? 'Scale Locked' : 'Lock Scale';
+    lockScaleBtn.title = scaleLocked
+      ? 'Scale is frozen; the same growth rate keeps the same color as you change the year span. Click to unlock and let it rescale to the new span.'
+      : 'Freeze the color scale so the same growth rate always maps to the same color as you change the year span.';
+    if (scaleLocked && lockedStats){
+      var fmt = metricMode === 'raw' ? fmtRaw : fmtPct;
+      lockScaleNoteEl.textContent = 'Locked to ' + fmt(-lockedStats.maxNeg) + '\u2026' + fmt(lockedStats.maxPos) + '. Unlock to let the scale fit each span again.';
+    } else {
+      lockScaleNoteEl.textContent = '';
+    }
+  }
+
+  lockScaleBtn.addEventListener('click', function(){
+    if (scaleLocked){
+      unlockScale();
+    } else {
+      // Snapshot exactly what's on screen right now -- lastLiveStats is set
+      // on every computeAndRender call, so this is always the current map's
+      // actual scale, not a stale one from before the last span change.
+      lockedStats = { maxPos: lastLiveStats.maxPos, maxNeg: lastLiveStats.maxNeg, k: lastLiveStats.k };
+      scaleLocked = true;
+    }
+    updateLockToggleUI();
+    computeAndRender(currentStart, currentEnd);
+  });
+
   // ---- colorblind-friendly palette toggle ----
   var colorblindToggleEl = document.getElementById('colorblind-toggle');
   if (colorblindToggleEl){
@@ -2383,6 +2478,9 @@ function linearForward(v, s) {
       if (mode === metricMode) return;
       metricMode = mode;
       document.querySelectorAll('.metric-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      // Percent and raw head-count numbers aren't comparable, so a scale
+      // frozen under one metric can't carry over meaningfully to the other.
+      if (scaleLocked){ unlockScale(); updateLockToggleUI(); }
       computeAndRender(currentStart, currentEnd);
     });
   });
@@ -2414,6 +2512,11 @@ function linearForward(v, s) {
           : 'Two fingers to pan & zoom \u00b7 tap a county for details';
       }
 
+      // State-level changes are far smaller and less extreme than
+      // county-level ones (aggregation smooths out small-county outliers),
+      // so a scale frozen at one level doesn't mean the same thing at the other.
+      if (scaleLocked){ unlockScale(); updateLockToggleUI(); }
+
       computeAndRender(currentStart, currentEnd);
     });
   });
@@ -2421,6 +2524,7 @@ function linearForward(v, s) {
   // ---- init ----
   buildTicks();
   renderThumbs();
+  updateLockToggleUI();
   computeAndRender(YEARS[startIdx], YEARS[endIdx]);
 
   } // end initApp
